@@ -6,6 +6,8 @@ import re
 import sys
 
 from library import phase
+from api_setup import active_key, check, setup
+from random_stories import choose_genre, genre_in
 
 BANNER = r"""
 +--------------------------------------------------+
@@ -25,6 +27,11 @@ STYLES = {"anime": "Anime", "pixelated": "Modern 3D Pixel Cinematic",
 
 
 def duration_hint(line):
+    hindi = re.search(r"(\d+)\s*[- ]?\s*(सेकंड|सेकेण्ड|मिनट)", line)
+    if hindi:
+        return int(hindi[1]) * (60 if hindi[2] == "मिनट" else 1)
+    if "एक मिनट" in line:
+        return 60
     line = re.sub(r"\b(one|two|three|five|ten)\s+(?=minutes?\b)", lambda m: {
         "one": "1 ", "two": "2 ", "three": "3 ", "five": "5 ", "ten": "10 "}[m[1]], line)
     match = re.search(r"\b(\d+)\s*[- ]?\s*(seconds?|secs?|s\b|minutes?|mins?)\b", line)
@@ -34,28 +41,36 @@ def duration_hint(line):
 def interpret(text, prior):
     line = text.casefold().strip(" .!")
     language = next((value for name, value in LANG.items()
-                     if re.search(rf"\b(?:in|to|use)\s+{name}\b|\b{name}\s+(?:video|story|dialogue)", line)), None)
+                     if line == name or re.search(rf"\b(?:in|to|use)\s+{name}\b|\b{name}\s+(?:video|story|dialogue)", line)), None)
+    language = language or next((value for term, value in {
+        "हिंदी": "Hindi", "हिन्दी": "Hindi", "अंग्रेज़ी": "English", "अंग्रेजी": "English",
+        "पंजाबी": "Punjabi", "उर्दू": "Urdu", "हिंग्लिश": "Hinglish",
+    }.items() if term in line), None)
+    genre = genre_in(line)
     style = next((value for name, value in STYLES.items()
-                  if re.search(rf"\b(?:use|in)\s+{name}\b|\b{name}\s+style\b", line)), None)
+                  if line == name or re.search(rf"\b(?:use|in)\s+{name}\b|\b{name}\s+style\b", line)), None)
     timing = duration_hint(line)
     reuse = bool(re.search(r"same (?:character|cast)", line))
-    revision = bool(prior and re.match(r"^(?:make it|make the|make a \d.*version|use |change |longer|shorter|one minute|two minutes|same )", line)
-                    and (language or style or timing or reuse or "longer" in line or "shorter" in line or "smoother" in line))
+    revision = bool(prior and (line in LANG or line in STYLES or re.match(r"^(?:इसे|इसको|make it|make the|make a \d.*version|use |change |longer|shorter|one minute|two minutes|same )", line))
+                    and (language or style or timing or reuse or genre or any(w in line for w in ("longer", "shorter", "smoother", "लंबा", "छोटा"))))
     result = dict(prior) if revision else {"idea": text, "duration": None, "language": "Hindi",
-                                            "style": "2D Cinematic Illustration", "random": False, "reuse": False}
+                                            "style": "2D Cinematic Illustration", "random": False, "reuse": False, "genre": None}
+    result["revision"] = revision
+    if genre:
+        result["genre"] = genre
     if language:
         result["language"] = language
     if style:
         result["style"] = style
     if timing is not None:
         result["duration"] = timing
-    if revision and timing is None and ("longer" in line or "shorter" in line):
-        result["duration"] = max(15, min(3600, (prior.get("duration") or 60) + (15 if "longer" in line else -15)))
+    if revision and timing is None and any(w in line for w in ("longer", "shorter", "लंबा", "छोटा")):
+        result["duration"] = max(15, min(3600, (prior.get("duration") or 60) + (15 if "longer" in line or "लंबा" in line else -15)))
     if revision and "smoother" in line:
         result["idea"] += "\nUse a stable character pose within each shot, eased movement and deliberate cuts."
     result["reuse"] |= reuse
     if not revision:
-        result["random"] = line == "random" or bool(re.search(r"\b(random|another idea|another video)\b", line))
+        result["random"] = bool(re.search(r"\b(random|another idea|another video|surprise me)\b", line)) or any(word in line for word in ("रैंडम", "यादृच्छिक", "कोई भी"))
     return result
 
 
@@ -81,7 +96,7 @@ def conversation(args, root, config, generate):
             continue
         if command in {"help", "menu"}:
             print('Try "Create a 30-second Hindi horror story in anime style". Afterward say "Make it longer".')
-            print("Commands: demo, random, history, settings, new, exit")
+            print("Commands: demo, random, history, settings, api setup, api check, new, exit")
             continue
         if command in {"new", "start over"}:
             prior = None
@@ -99,9 +114,19 @@ def conversation(args, root, config, generate):
             print("Hindi | Original Phishing pilot format | 1080×1920 portrait by default")
             print(root / "videos")
             continue
+        if command in {"api setup", "setup api", "api check", "check api"}:
+            try:
+                if "setup" in command:
+                    setup(root, config)
+                else:
+                    check(config)
+            except (OSError, ValueError) as error:
+                print(f"API setup: {error}")
+            continue
         run = copy.copy(args)
         run.studio = False
-        openai = os.getenv("OPENAI_API_KEY") or config.get("openai_api_key")
+        run.offline = run.offline or "offline" in command.split()
+        openai = "" if run.offline else active_key(config)
         if command == "demo":
             run.demo = True
         else:
@@ -118,23 +143,30 @@ def conversation(args, root, config, generate):
                     break
             request = interpret(text, prior)
             prior = request
-            if request["random"] and command in {"random", "random video", "make a random video", "create a random video", "create a random video for me", "create another video", "give me another idea"} and not openai:
+            if request["random"] and not request.get("genre"):
+                request["genre"] = choose_genre(local=not openai)
+                if request["genre"] is None:
+                    continue
+            if request["random"] and not openai:
+                if request["language"] != "Hindi":
+                    print("The local story bank is in Hindi. Use api setup to generate another language.")
+                    continue
                 run.random = True
+                run.genre = request.get("genre")
+                run.duration = request["duration"]
+                if request["revision"] and (run.genre in (None, "any", request.get("last_local_genre"))):
+                    run.local_story = request.get("last_local_story")
             elif not openai:
-                print("Custom prompts need OPENAI_API_KEY for the screenplay. Type demo or random for the local illustrated stories.")
+                print("Custom prompts need an OpenAI key. Type api setup to add one, or random for local stories by genre.")
                 continue
             else:
                 if request["duration"] is None:
-                    try:
-                        answer = input("How long? Enter for 60 seconds: ").strip()
-                    except (EOFError, KeyboardInterrupt):
-                        print()
-                        return
-                    request["duration"] = duration_hint(answer.casefold()) or (int(answer) if answer.isdecimal() else 60)
+                    request["duration"] = 60
                 run.prompt = request["idea"]
                 run.random = request["random"]
+                run.genre = request.get("genre")
                 run.duration, run.language, run.style = request["duration"], request["language"], request["style"]
-                run.mode = "cyber" if re.search(r"\b(cyber\w*|scam\w*|hacker|phishing|malware)\b", run.prompt.casefold()) else "general"
+                run.mode = "cyber" if run.genre == "cybersecurity" else "general"
                 if request["reuse"]:
                     for metadata in latest_jobs(root):
                         source = metadata.parent / "production.json"
@@ -147,5 +179,13 @@ def conversation(args, root, config, generate):
         try:
             phase("START", "Preparing production")
             generate(run)
+            if run.random and not openai and prior is not None and (jobs := latest_jobs(root)):
+                record = jobs[0].parent / "production.json"
+                if record.is_file():
+                    local = json.loads(record.read_text(encoding="utf-8"))
+                    prior.update(last_local_story=local.get("local_story"), last_local_genre=local["spec"].get("genre"),
+                                 duration=local["spec"].get("duration", prior["duration"]))
         except (ImportError, OSError, RuntimeError, ValueError, KeyError) as error:
             print(f"VideoAI: {error}")
+            if run.random and openai:
+                print("You can also type offline random to use the local story bank.")

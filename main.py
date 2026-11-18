@@ -15,7 +15,9 @@ import wave
 
 from content import BEATS, generate, key
 from library import finish, job_name, slug
-from terminal import conversation
+from terminal import conversation, interpret
+from api_setup import active_key, check as api_check, setup as api_setup
+from random_stories import choose_genre, genre_in
 from studio import studio_main, studio_parser
 
 ROOT = Path(__file__).resolve().parent
@@ -265,15 +267,32 @@ def main():
     topic_option.add_argument("--topic", help="Cybersecurity topic")
     topic_option.add_argument("--auto", action="store_true", help="Pick a fresh topic without prompting")
     parser.add_argument("--offline-voice", action="store_true", help="Use Windows Speech for an offline render")
+    parser.add_argument("--api-setup", action="store_true")
+    parser.add_argument("--api-check", action="store_true")
     studio_parser(parser)
     args = parser.parse_args()
     if args.demo_story:
         args.demo = True
+    if args.prompt:
+        request = interpret(args.prompt, None)
+        args.random = args.random or request["random"]
+        args.genre = args.genre or request["genre"]
+        args.duration = args.duration if args.duration is not None else request["duration"]
+        args.language = args.language or request["language"]
+        args.style = args.style or request["style"]
     config = read_json(ROOT / "config.json", {}) | read_json(ROOT / "config.local.json", {})
     library_root = (ROOT / "videos").resolve()
     if not library_root.is_relative_to(ROOT.resolve()):
         raise ValueError("The videos folder must be inside the application directory.")
     config.update(output_folder="videos", named_library=True)
+    if args.api_setup:
+        return api_setup(ROOT, config)
+    if args.api_check:
+        return api_check(config)
+    if args.random and not args.genre and not args.local_animation and not args.demo and sys.stdin.isatty():
+        args.genre = genre_in(args.prompt or args.topic or "") or choose_genre(local=args.offline or not active_key(config))
+        if args.genre is None:
+            return
     if len(sys.argv) == 1 or args.studio:
         return conversation(args, ROOT, config, lambda run: studio_main(
             run, ROOT, config, ffmpeg_path, ffmpeg, captions, stamp))

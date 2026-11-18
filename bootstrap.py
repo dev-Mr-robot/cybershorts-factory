@@ -59,7 +59,7 @@ def main():
     if "--login" in args:
         args.remove("--login")
         codex_login()
-    informational = any(flag in args for flag in ("--help", "-h", "--list-styles"))
+    informational = any(flag in args for flag in ("--help", "-h", "--list-styles", "--api-check", "--api-setup"))
     python = sys.executable if informational or "--no-install" in args else dependencies(args)
     if "--setup" in args or "--setup-all" in args:
         return 0

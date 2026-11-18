@@ -23,7 +23,7 @@ On Windows, run `powershell -NoProfile -File install.ps1` from this folder, then
 
 Describe a story in your own words. Examples include "Make a 30-second Hindi horror story in anime style", "Make it longer", and "Use the same character as my previous video". Interactive settings stay in the conversation. Reuse of a character's saved visual references requires a previous Runway production. Commands include `help`, `menu`, `new`, `random`, `demo`, `history`, `settings`, and `exit`. Use `--cast-from path/to/production.json` for explicit reference reuse.
 
-New renders go inside the application under `videos/` with separate job folders, safe video filenames, scripts, subtitles, per-shot audio and footage, and `metadata.json`. Old files under `output/` are preserved. Custom prompts require an OpenAI key for planning. Runway requires a separate key only when selected explicitly. With no keys, `random` rotates the authored demos. Edge TTS needs internet access.
+New renders go inside the application under `videos/` with separate job folders, safe video filenames, scripts, subtitles, per-shot audio and footage, and `metadata.json`. Old files under `output/` are preserved. Custom prompts require an OpenAI key for planning. Runway requires a separate key only when selected explicitly. With no key, `random` draws from a local Hindi story bank and asks for a genre. Finished local stories are skipped until the selected genre runs out. Edge TTS needs internet access.
 
 ## Windows
 
@@ -64,11 +64,20 @@ python main.py --random --local-animation --style Pixelated --seed 379826793
 
 Each new job receives a seed for creative direction, pacing, visual treatment and music. Studio also passes recent concepts to the planner and carries a continuity brief and character references between shots. A recurring location can get its own visual reference. A seed is reproducible for local animation. Cloud planning and footage can still vary with the same seed. Use `--resume` to continue a specific Studio plan.
 
-With both API keys present, `--random` runs the full AI video pipeline. Without both keys, a plain `--random` renders the authored full-screen Hindi 2D fallback. With an explicit `--local-animation`, it instead renders an English **Modern 3D Pixel Cinematic** short from a small story library. It varies casting, palettes, camera direction and music, and rotates recent premises. The local renderer uses an OpenGL 3.3 graphics driver for actual 3D geometry, shaded pixel materials, cast shadows, atmospheric depth, and moving cameras. It needs Edge TTS for dialogue, supports 24–120 seconds in landscape, and saves under `videos/random/`.
+With an OpenAI key, `--random` plans an original story for the selected genre. Without a key, it chooses an unused story from the local Hindi bank. With an explicit `--local-animation`, it instead renders an English **Modern 3D Pixel Cinematic** short from a small story library. It varies casting, palettes, camera direction and music, and rotates recent premises. The local renderer uses an OpenGL 3.3 graphics driver for actual 3D geometry, shaded pixel materials, cast shadows, atmospheric depth, and moving cameras. It needs Edge TTS for dialogue, supports 24–120 seconds in landscape, and saves under `videos/random/`.
 
 ## Pixel styles
 
 `Pixelated`, `Pixel Art`, and preset `5` select **Modern 3D Pixel Cinematic**. Other Studio presets include High-Resolution Pixel Art, 3D Voxel Cinematic, Pixel-Shader 3D, Hybrid 3D + Pixel, Pixel Cyberpunk, Pixel Fantasy, and Pixel Realism. These are distinct Runway art directions. The local generator implements Modern 3D Pixel Cinematic plus **Retro Pixel Art**, which is available only by explicit selection (for example, `--style "Retro Pixel Art"` or `--style "8-bit"`).
+
+## Kali Linux, natural-language prompts, and API setup
+
+Run `sh install.sh` once, then `Cyber`. If the installer asks you to add its bin folder to PATH, use the displayed command. On Kali, install `python3-venv`, `ffmpeg`, and `fonts-noto-core` through APT if your system needs them. The application's dependencies install into its own virtual environment.
+
+- Type `random` to pick a genre, or say `random horror`, `random comedy`, or `एक रैंडम डरावनी कहानी बनाओ` directly.
+- Use `Cyber --random --genre horror` for noninteractive generation. With an OpenAI key it creates a new premise and checks recent titles and summaries before accepting it. Without a key it selects an unused authored Hindi story from the chosen genre. Use `--offline` or type `offline random horror` to choose this path even when a key is configured.
+- Run `Cyber --api-setup` to enter a project API key through a hidden prompt. Run `Cyber --api-check` to verify model access. Keys stay in the ignored local config or the environment. An exported `OPENAI_API_KEY` takes precedence. Model access and available generation quota are separate.
+- Follow-ups such as `Make it longer`, `इसे अंग्रेज़ी में बनाओ`, and `Use anime style` carry over the current idea in the terminal session.
 
 ## Source research
 

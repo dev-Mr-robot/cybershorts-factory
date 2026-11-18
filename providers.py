@@ -11,9 +11,15 @@ from urllib.request import Request, urlopen
 
 
 class ProviderHTTPError(RuntimeError):
-    def __init__(self, host, status):
+    def __init__(self, host, status, code=None):
         self.status = status
-        super().__init__(f"{host} returned HTTP {status}. Check credentials, credits, inputs or rate limits.")
+        self.code = code
+        guidance = {
+            "insufficient_quota": "Check the API project's billing, available quota, and spending limit.",
+            "invalid_api_key": "Run Cyber --api-setup to configure a valid project key.",
+            "model_not_found": "Check the configured model and the project's model permissions.",
+        }.get(code, "Check credentials, credits, inputs or rate limits.")
+        super().__init__(f"{host} returned HTTP {status}. {guidance}")
 
 
 def request_json(url, key, body=None, headers=None, *, timeout=100):
@@ -24,7 +30,12 @@ def request_json(url, key, body=None, headers=None, *, timeout=100):
             return json.load(response)
     except HTTPError as error:
         host = urlsplit(url).hostname
-        raise ProviderHTTPError(host, error.code) from error
+        code = None
+        try:
+            code = json.loads(error.read(8192)).get("error", {}).get("code")
+        except (ValueError, AttributeError, OSError):
+            pass
+        raise ProviderHTTPError(host, error.code, code if isinstance(code, str) else None) from error
     except URLError as error:
         raise RuntimeError(f"Could not reach {urlsplit(url).hostname}: {error.reason}") from error
 

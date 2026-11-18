@@ -16,6 +16,8 @@ from split_screen import LAYOUTS, OUTPUT_RATIO, compose_split, split_layout
 from visual_styles import MODERN_PIXEL, PIXEL_STYLES, pixel_style, style_direction
 from providers import Runway, request_json, save_json
 from library import completed_video, finish, job_name, phase, slug
+from api_setup import active_key
+from random_stories import GENRES, genre_in, local_plan
 from research import gather, should_research
 from story_review import inspect_story
 from video_timeline import inspect_clip, motion_timeline, visual_prompts
@@ -82,6 +84,9 @@ def studio_parser(parser):
                         help="Pick the motion backend for the full-screen production.")
     parser.add_argument("--cast-from", type=Path, help="Reuse character references from a production.json")
     parser.add_argument("--demo-story", choices=("refund", "flame"), help="Choose the built-in demo story")
+    parser.add_argument("--offline", action="store_true", help="Use the local story bank for random videos")
+    parser.add_argument("--local-story", help=argparse.SUPPRESS)
+    parser.add_argument("--genre", help="Genre for the story, such as horror, comedy, or cybersecurity")
     parser.add_argument("--research", action=argparse.BooleanOptionalAction, default=None,
                         help="Enable or skip source research before planning")
     parser.add_argument("--demo", action="store_true", help="Render the full-screen Hindi animated demo")
@@ -113,7 +118,9 @@ def options(args):
         args.locale = input("Voice accent/locale override (optional): ").strip() or None
         print("Press Enter to generate, or type plan to save the screenplay only.")
         args.plan_only = input("Generate [Enter]: ").strip().casefold() == "plan"
-    mode = args.mode or ("cyber" if args.topic or args.auto else "general")
+    genre = args.genre or genre_in(args.prompt or args.topic or "")
+    genre = genre_in(genre) or genre if genre else None
+    mode = args.mode or ("cyber" if args.topic or args.auto or genre == "cybersecurity" else "general")
     idea = (args.prompt or args.topic or "").strip()
     if not idea and mode == "general":
         raise ValueError("General mode needs a --prompt.")
@@ -141,7 +148,7 @@ def options(args):
         if not separator or not name.strip() or not voice.strip():
             raise ValueError("Voice overrides use CHARACTER=EDGE_VOICE_ID.")
         overrides[name.strip().casefold()] = voice.strip()
-    return {"mode": mode, "idea": idea, "duration": duration, "count": count, "style": style,
+    return {"mode": mode, "genre": genre, "idea": idea, "duration": duration, "count": count, "style": style,
             "language": language, "locale": args.locale, "voices": overrides,
             "recurring_cast": args.recurring_cast,
             "ratio": "1280:720" if (args.format or "portrait") == "landscape" else "720:1280"}
@@ -547,27 +554,31 @@ def studio_main(args, root, config, ffmpeg_path, ffmpeg, captions, stamp):
         show_styles()
         return
     jobs = root / config["output_folder"] / "studio"
-    openai = os.getenv("OPENAI_API_KEY") or config.get("openai_api_key")
+    openai = "" if args.offline else active_key(config)
+    if args.offline and not (args.random or args.demo):
+        raise ValueError("--offline is available for random stories and the built-in demo.")
     runway_key = os.getenv("RUNWAYML_API_SECRET") or config.get("runway_api_key")
     if args.split_screen or args.split_demo or args.layout != "auto" or args.narrator:
         raise ValueError("Studio now creates full-screen stories. Use --demo or --prompt for a new video.")
-    default_local_demo = (
-        args.random and not args.local_animation and not args.mode and not args.prompt
-        and not args.topic and not args.plan_only and not args.style
-        and args.video_backend in {"auto", "pilot"} and not openai
-    )
-    if args.demo or default_local_demo:
+    if args.random and not openai and not args.local_animation and not args.demo and args.video_backend in {"auto", "pilot"}:
+        if args.language and args.language.casefold() not in {"hindi", "hi-in"}:
+            raise ValueError("The local story bank uses Hindi. Use Cyber --api-setup for custom languages.")
+        requested = args.genre or genre_in(args.prompt or args.topic or "") or ("cybersecurity" if args.mode == "cyber" else "any")
+        plan = local_plan(jobs, genre_in(requested) or requested.casefold(), args.seed if args.seed is not None else fresh_seed(), args.duration, args.local_story)
+        job = jobs / job_name(plan["story"]["slug"])
+        job.mkdir(parents=True)
+        save_json(job / "production.json", plan)
+        print(f"Local {plan['spec']['genre']} story: {plan['story']['title']}", flush=True)
+        if args.plan_only:
+            print(job / "production.json")
+            return
+        from pilot_format import render_plan
+        return render_plan(plan, ffmpeg_path(), ffmpeg, captions, stamp, root, job, config)
+    if args.demo:
         import cyber_demo
         from full_demo import STYLE, render_illustrated, storyboard
 
-        selected = args.demo_story
-        if not selected and default_local_demo:
-            recent = sorted((root / config["output_folder"] / "full-screen").glob("*/metadata.json"),
-                            key=lambda item: item.stat().st_mtime, reverse=True)
-            if recent:
-                title = json.loads(recent[0].read_text(encoding="utf-8"))["title"]
-                selected = "flame" if title == cyber_demo.TITLE else "refund"
-        production = None if selected == "flame" else cyber_demo
+        production = None if args.demo_story == "flame" else cyber_demo
 
         if args.resume:
             raise ValueError("Use --resume by itself to resume a Runway production.")
@@ -603,7 +614,7 @@ def studio_main(args, root, config, ffmpeg_path, ffmpeg, captions, stamp):
     if args.random and args.resume:
         raise ValueError("Choose --random for a new job or --resume for an existing job.")
     seed = args.seed if args.seed is not None else fresh_seed()
-    if args.random and not args.split_screen and (args.local_animation or (not args.mode and not args.plan_only and args.video_backend == "auto" and not (openai and runway_key))):
+    if args.random and args.local_animation:
         from local_motion import local_movie
 
         return local_movie(args, root, config, ffmpeg_path, ffmpeg, captions, stamp, seed)
@@ -626,9 +637,14 @@ def studio_main(args, root, config, ffmpeg_path, ffmpeg, captions, stamp):
             raise ValueError("Split-screen jobs are archived. Start a new full-screen production.")
     else:
         creative = direction(seed)
-        if args.random and not (args.prompt or args.topic):
-            args.prompt = ("Invent an unexpected self-contained story. Use this as a loose creative spark: "
-                           f"{creative['setting_spark']}.")
+        if args.random:
+            genre = args.genre or genre_in(args.prompt or args.topic or "")
+            if genre in {None, "any"}:
+                genre = random.Random(seed).choice(tuple(GENRES))
+            args.genre = genre
+            hint = args.prompt or args.topic or ""
+            args.prompt = (f"Invent an original {genre} story. Use {creative['setting_spark']} only if it fits. "
+                           f"Do not reuse prior premises, cast and twist together. User preferences: {hint}")
         spec = options(args)
         if args.cast_from:
             source = args.cast_from.resolve()
@@ -641,12 +657,12 @@ def studio_main(args, root, config, ffmpeg_path, ffmpeg, captions, stamp):
         if spec["mode"] == "cyber":
             weights = config.get("content_mix", {"funny": 40, "educational": 40, "serious": 20})
             spec["tone"] = random.Random(seed).choices(list(weights), weights=list(weights.values()))[0]
-        recent = sorted(jobs.glob(f"{spec['mode']}-*/production.json"), key=lambda path: path.stat().st_mtime, reverse=True)
+        recent = sorted(jobs.glob("*/production.json"), key=lambda path: path.stat().st_mtime, reverse=True)
         spec["recent_concepts"] = [
             {key: story.get(key, "") for key in ("title", "summary", "style")}
             for path in recent[:10]
             if (story := json.loads(path.read_text(encoding="utf-8")).get("story"))
-        ] if args.seed is None else []
+        ] if args.seed is None or args.random else []
         job = jobs / f"{spec['mode']}-{uuid.uuid4().hex[:10]}"
         record = job / "production.json"
         plan = {"spec": spec, "chapters": [],
@@ -654,7 +670,7 @@ def studio_main(args, root, config, ffmpeg_path, ffmpeg, captions, stamp):
     lengths = plan.get("shot_lengths", shot_lengths(spec["duration"]))
     chapters = plan.get("chapter_lengths") or [lengths[i:i + 9] for i in range(0, len(lengths), 9)]
     if len(plan["chapters"]) < len(chapters) and not openai:
-        raise ValueError("Set OPENAI_API_KEY for story planning.")
+        raise ValueError("Run Cyber --api-setup or set OPENAI_API_KEY for custom story planning.")
     use_runway = args.video_backend == "runway" or (args.resume and plan.get("renderer") == "generative-video")
     if use_runway and not args.plan_only and not runway_key:
         raise ValueError("Set RUNWAYML_API_SECRET for custom motion, use --plan-only, or run --demo --video-backend illustrated.")
@@ -675,7 +691,21 @@ def studio_main(args, root, config, ffmpeg_path, ffmpeg, captions, stamp):
     if spec.get("research"):
         save_json(job / "sources.json", spec["research"])
     if "story" not in plan:
-        plan["story"] = blueprint(openai, model, spec, len(chapters))
+        def identity(text):
+            return "".join(char for char in text.casefold() if not char.isspace() and char not in ".,!?।-")
+        recent_titles = {identity(item["title"]) for item in spec.get("recent_concepts", []) if item["title"]}
+        recent_summaries = {identity(item["summary"]) for item in spec.get("recent_concepts", []) if item["summary"]}
+        for attempt in range(3):
+            proposal = blueprint(openai, model, spec, len(chapters))
+            if not args.random or (identity(proposal["title"]) not in recent_titles and identity(proposal["summary"]) not in recent_summaries):
+                plan["story"] = proposal
+                break
+            phase("IDEA", "That title or premise was already used. Trying a new one.")
+            spec.setdefault("recent_concepts", []).append({"title": proposal["title"], "summary": proposal["summary"]})
+            recent_titles.add(identity(proposal["title"]))
+            recent_summaries.add(identity(proposal["summary"]))
+        else:
+            raise RuntimeError("The planner repeated recent ideas. Try another genre.")
         save_json(record, plan)
     story = plan["story"]
     for index in range(len(plan["chapters"]), len(chapters)):
