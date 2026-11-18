@@ -1,0 +1,8 @@
+__pycache__/
+.venv/
+config.local.json
+output/
+.history.json
+assets/gameplay/*
+assets/music/*
+videos/

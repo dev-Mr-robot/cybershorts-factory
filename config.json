@@ -1,0 +1,11 @@
+{
+  "openai_api_key": "",
+  "openai_model": "gpt-4o-mini",
+  "voice": "hi-IN-MadhurNeural",
+  "gameplay_folder": "assets/gameplay",
+  "music_folder": "assets/music",
+  "output_folder": "videos",
+  "duration": 50,
+  "resolution": [1080, 1920],
+  "content_mix": {"funny": 40, "educational": 40, "serious": 20}
+}
