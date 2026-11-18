@@ -283,7 +283,8 @@ def main():
                             or args.locale or args.characters is not None or args.voice or args.format
                             or args.random or args.local_animation or args.seed is not None
                             or args.split_screen or args.split_demo or args.layout != "auto" or args.narrator
-                            or args.video_backend != "auto" or args.demo or args.recurring_cast or args.cast_from)
+                            or args.video_backend != "auto" or args.demo or args.recurring_cast or args.cast_from
+                            or args.research is not None)
     if not studio_requested and not args.offline_voice and (
         args.auto or (args.topic and key(args.topic) != "phishing")
     ):
@@ -357,5 +358,5 @@ def main():
 if __name__ == "__main__":
     try:
         main()
-    except (EOFError, OSError, RuntimeError, ValueError, KeyError, subprocess.CalledProcessError) as error:
+    except (EOFError, ImportError, OSError, RuntimeError, ValueError, KeyError, subprocess.CalledProcessError) as error:
         raise SystemExit(f"CyberShorts: {error}") from error

@@ -147,5 +147,5 @@ def conversation(args, root, config, generate):
         try:
             phase("START", "Preparing production")
             generate(run)
-        except (OSError, RuntimeError, ValueError, KeyError) as error:
+        except (ImportError, OSError, RuntimeError, ValueError, KeyError) as error:
             print(f"VideoAI: {error}")

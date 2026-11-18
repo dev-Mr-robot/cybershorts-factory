@@ -27,6 +27,8 @@ def render_plan(plan, tool, ffmpeg, captions, stamp, root, job, config):
     avatars.setdefault("Narrator", slots[0])
     plan["renderer"] = "original-phishing-pilot"
     save_json(job / "production.json", plan)
+    if spec.get("research"):
+        save_json(job / "sources.json", spec["research"])
     save_json(job / "character-design.json", [
         person | {"pilot_sprite": avatars[person["name"]]} for person in story["cast"]])
     with Image.open(root / "assets" / "story" / "city.png") as image:

@@ -6,7 +6,9 @@ from library import phase
 RULES = """Review an animated screenplay for the requested subject. Judge what the audience
 actually sees and hears, not what the summary promises. Each important claim needs an on-screen
 action, contrast, or consequence. Check clear cause and effect, accurate facts, audience language,
-and a resolution grounded in the setup. For cybersecurity, show what the victim sees, the warning
+and a resolution grounded in the setup. When sourced research is available, check
+the screenplay against it. When sources are unavailable, favor well-established
+claims and remove unsupported specifics. For cybersecurity, show what the victim sees, the warning
 sign, the consequence or narrowly avoided consequence, and demonstrate a defensive alternative
 and its result. Keep all examples defensive and avoid attack replication or payloads. Other genres
 should make their own story logic and payoff clear; don't force an explanation into fiction.
@@ -33,7 +35,7 @@ def inspect_story(plan, key, model, ask, rewrite, save):
             phase("REVIEW", f"Checking story logic in chapter {index + 1} (pass {attempt + 1})")
             verdict = ask(key, model, RULES, {
                 "request": spec["idea"], "mode": spec["mode"], "language": spec["language"],
-                "renderer": spec.get("render_backend", "pilot"),
+                "renderer": spec.get("render_backend", "pilot"), "research": spec.get("research"),
                 "outline": story["chapters"], "chapter": index + 1, "shots": group,
                 "previous_action": plan["chapters"][index - 1][-1]["action"] if index else None,
             })

@@ -92,6 +92,10 @@ def storyboard(style=motion.STYLE, seed=motion.SEED):
     plan["shot_lengths"] = [6] * len(PILOT_BEATS)
     plan["chapter_lengths"] = [plan["shot_lengths"][:]]
     plan["spec"]["duration"] = sum(plan["shot_lengths"])
+    plan["spec"]["research"] = {
+        "status": "sourced", "notes": "NPCI explains that a UPI PIN is used to make a payment, not to receive money.",
+        "sources": [{"title": "NPCI fraud awareness", "url": "https://www.npci.org.in/fraud-awareness"}],
+    }
     plan["quality_review"] = {"status": "passed", "method": "authored",
                               "checks": ["refund claim", "outgoing-payment warning", "avoided loss",
                                          "decline", "check official transaction history", "verify independently"]}

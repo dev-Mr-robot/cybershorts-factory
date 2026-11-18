@@ -1,17 +1,19 @@
 #!/usr/bin/env sh
 set -eu
 app_dir=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)
-python_cmd=${PYTHON:-python3}
-"$python_cmd" -c 'import sys; sys.exit(0 if sys.version_info >= (3, 11) else "Python 3.11 or newer is required.")'
-if ! command -v ffmpeg >/dev/null 2>&1; then
-    printf '%s\n' 'Install FFmpeg with libass first. On Debian/Ubuntu: sudo apt install ffmpeg fonts-noto-core python3-venv' >&2
-    exit 1
+bin_dir="${XDG_BIN_HOME:-$HOME/.local/bin}"
+chmod +x "$app_dir/Cyber" "$app_dir/videoai"
+mkdir -p "$bin_dir"
+if [ -e "$bin_dir/Cyber" ] || [ -L "$bin_dir/Cyber" ]; then
+    if [ "$(readlink -f -- "$bin_dir/Cyber")" != "$app_dir/Cyber" ]; then
+        printf '%s\n' "A different Cyber command already exists at $bin_dir/Cyber." >&2
+        exit 1
+    fi
+else
+    ln -s "$app_dir/Cyber" "$bin_dir/Cyber"
 fi
-if ! ffmpeg -hide_banner -filters 2>/dev/null | grep -q 'subtitles'; then
-    printf '%s\n' 'This FFmpeg build needs libass subtitle rendering.' >&2
-    exit 1
-fi
-"$python_cmd" -m venv "$app_dir/.venv"
-"$app_dir/.venv/bin/python" -m pip install -r "$app_dir/requirements.txt"
-chmod +x "$app_dir/videoai"
-printf '%s\n' "Installed. Start with: $app_dir/videoai"
+"$app_dir/Cyber" --setup
+case ":$PATH:" in
+    *":$bin_dir:"*) printf '%s\n' "Start with: Cyber" ;;
+    *) printf '%s\n' "Add $bin_dir to PATH, then run Cyber. For this session: export PATH=\"$bin_dir:\$PATH\"" ;;
+esac

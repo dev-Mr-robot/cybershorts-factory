@@ -1,0 +1,5 @@
+#!/usr/bin/env sh
+set -eu
+entry=$(readlink -f -- "$0")
+app_dir=$(CDPATH='' cd -- "$(dirname -- "$entry")" && pwd)
+exec "${PYTHON:-python3}" "$app_dir/bootstrap.py" "$@"

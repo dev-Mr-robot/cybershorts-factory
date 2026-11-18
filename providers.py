@@ -16,11 +16,11 @@ class ProviderHTTPError(RuntimeError):
         super().__init__(f"{host} returned HTTP {status}. Check credentials, credits, inputs or rate limits.")
 
 
-def request_json(url, key, body=None, headers=None):
+def request_json(url, key, body=None, headers=None, *, timeout=100):
     request = Request(url, data=json.dumps(body, ensure_ascii=False).encode("utf-8") if body is not None else None,
                       headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"} | (headers or {}))
     try:
-        with urlopen(request, timeout=100) as response:
+        with urlopen(request, timeout=timeout) as response:
             return json.load(response)
     except HTTPError as error:
         host = urlsplit(url).hostname

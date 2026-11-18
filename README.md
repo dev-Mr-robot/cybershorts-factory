@@ -6,15 +6,20 @@ New productions use the actual animated Phishing pilot renderer: its 2D sprite c
 
 Before rendering a custom story, Studio reviews what viewers will actually see and hear. If the logic is unclear, it revises the affected chapter and can add time for missing beats. The requested duration is a starting target. Review results and the final timeline are saved in `production.json`. The built-in refund demo uses an authored 60-second walkthrough.
 
-## Linux
+## Start with Cyber
+
+On Linux:
 
 ```sh
-sudo apt install ffmpeg fonts-noto-core python3-venv   # Debian/Ubuntu
 sh install.sh
-./videoai
+Cyber
 ```
 
-Python 3.11 or newer and an FFmpeg build with libass are required. The launcher uses the project virtual environment and can run from any directory. Add the application directory to your PATH if you want to invoke it as `videoai`.
+The installer registers `Cyber` in `~/.local/bin` and prints a PATH command if needed. It uses Python 3.11+ and installs the core Python packages into the project's virtual environment. The core package includes a compatible FFmpeg fallback on supported platforms. For Hindi text on Linux, install your distribution's Noto Devanagari font package, for example `fonts-noto-core` on Debian/Ubuntu. If Python's virtual environment support is missing, install your distribution's `python3-venv` package and retry `Cyber --setup`.
+
+On Windows, run `powershell -NoProfile -File install.ps1` from this folder, then open a new terminal and type `Cyber`. `Cyber.cmd` also runs directly from the project folder. The launcher can open the CLI if dependency setup fails. Use `Cyber --setup` to retry, `Cyber --setup-all` for optional 3D dependencies, or `Cyber --no-install` to skip automatic setup on a specific launch.
+
+`Cyber --login` optionally runs the installed Codex CLI's own sign-in flow. Missing Codex or a canceled sign-in leaves Cyber available. Built-in demos need neither Codex sign-in nor an OpenAI API key. Custom scripts and source research use `OPENAI_API_KEY` separately. See the [Codex CLI guide](https://developers.openai.com/codex/cli/).
 
 Describe a story in your own words. Examples include "Make a 30-second Hindi horror story in anime style", "Make it longer", and "Use the same character as my previous video". Interactive settings stay in the conversation. Reuse of a character's saved visual references requires a previous Runway production. Commands include `help`, `menu`, `new`, `random`, `demo`, `history`, `settings`, and `exit`. Use `--cast-from path/to/production.json` for explicit reference reuse.
 
@@ -64,6 +69,10 @@ With both API keys present, `--random` runs the full AI video pipeline. Without 
 ## Pixel styles
 
 `Pixelated`, `Pixel Art`, and preset `5` select **Modern 3D Pixel Cinematic**. Other Studio presets include High-Resolution Pixel Art, 3D Voxel Cinematic, Pixel-Shader 3D, Hybrid 3D + Pixel, Pixel Cyberpunk, Pixel Fantasy, and Pixel Realism. These are distinct Runway art directions. The local generator implements Modern 3D Pixel Cinematic plus **Retro Pixel Art**, which is available only by explicit selection (for example, `--style "Retro Pixel Art"` or `--style "8-bit"`).
+
+## Source research
+
+Cybersecurity and factual prompts try web research before screenplay planning. The planner and editorial check receive the notes, and source links are saved in `sources.json`. Use `--research` to request the lookup for another topic, or `--no-research` to skip it. If the lookup is unavailable, the screenplay uses conservative claims and the output records the lookup status. The refund demo includes a curated NPCI reference. Optional research uses OpenAI's [Responses web search](https://developers.openai.com/api/docs/guides/tools-web-search).
 
 ## Full-screen Hindi demo
 
