@@ -12,6 +12,7 @@ from urllib.request import Request, urlopen
 
 class ProviderHTTPError(RuntimeError):
     def __init__(self, host, status, code=None):
+        self.host = host
         self.status = status
         self.code = code
         guidance = {
@@ -20,6 +21,12 @@ class ProviderHTTPError(RuntimeError):
             "model_not_found": "Check the configured model and the project's model permissions.",
         }.get(code, "Check credentials, credits, inputs or rate limits.")
         super().__init__(f"{host} returned HTTP {status}. {guidance}")
+
+
+class ProviderConnectionError(RuntimeError):
+    def __init__(self, host, reason):
+        self.host = host
+        super().__init__(f"Could not reach {host}: {reason}")
 
 
 def request_json(url, key, body=None, headers=None, *, timeout=100):
@@ -37,7 +44,9 @@ def request_json(url, key, body=None, headers=None, *, timeout=100):
             pass
         raise ProviderHTTPError(host, error.code, code if isinstance(code, str) else None) from error
     except URLError as error:
-        raise RuntimeError(f"Could not reach {urlsplit(url).hostname}: {error.reason}") from error
+        raise ProviderConnectionError(urlsplit(url).hostname, error.reason) from error
+    except TimeoutError as error:
+        raise ProviderConnectionError(urlsplit(url).hostname, "request timed out") from error
 
 
 def save_json(path, value):

@@ -14,9 +14,10 @@ import wave
 from creative import direction, fresh_seed, lengths_for
 from split_screen import LAYOUTS, OUTPUT_RATIO, compose_split, split_layout
 from visual_styles import MODERN_PIXEL, PIXEL_STYLES, pixel_style, style_direction
-from providers import Runway, request_json, save_json
+from providers import ProviderConnectionError, ProviderHTTPError, Runway, request_json, save_json
 from library import completed_video, finish, job_name, phase, slug
-from api_setup import active_key
+from api_setup import planning_access
+from chatgpt_planner import CHATGPT, request_story
 from random_stories import GENRES, genre_in, local_plan
 from research import gather, should_research
 from story_review import inspect_story
@@ -161,6 +162,8 @@ def shot_lengths(seconds):
 
 
 def ask(key, model, system, payload):
+    if key is CHATGPT:
+        return request_story(DEFENSIVE + " " + system, payload)
     response = request_json("https://api.openai.com/v1/chat/completions", key, {
         "model": model, "response_format": {"type": "json_object"},
         "messages": [{"role": "system", "content": DEFENSIVE + " " + system},
@@ -558,11 +561,32 @@ def assemble(tool, ffmpeg, stamp, root, job, story, shots, spec, config):
 
 
 def studio_main(args, root, config, ffmpeg_path, ffmpeg, captions, stamp):
+    from copy import copy
+
+    try:
+        return run_studio(args, root, config, ffmpeg_path, ffmpeg, captions, stamp)
+    except (ProviderConnectionError, ProviderHTTPError) as error:
+        if error.host not in {"api.openai.com", "chatgpt"} or not args.random or args.offline or args.resume or args.video_backend == "runway":
+            raise
+        if args.language and args.language.casefold() not in {"hindi", "hi-in"}:
+            raise
+        if args.genre and args.genre not in {"any", *GENRES}:
+            raise
+        phase("API", f"{error} Trying an unused local Hindi story instead.")
+        local = copy(args)
+        local.offline = True
+        if local.duration is not None and not 24 <= local.duration <= 60:
+            phase("LOCAL", "Using the local bank's 28-second default.")
+            local.duration = None
+        return run_studio(local, root, config, ffmpeg_path, ffmpeg, captions, stamp)
+
+
+def run_studio(args, root, config, ffmpeg_path, ffmpeg, captions, stamp):
     if args.list_styles:
         show_styles()
         return
     jobs = root / config["output_folder"] / "studio"
-    openai = "" if args.offline else active_key(config)
+    openai = "" if args.offline else planning_access(config)
     if args.offline and not (args.random or args.demo):
         raise ValueError("--offline is available for random stories and the built-in demo.")
     runway_key = os.getenv("RUNWAYML_API_SECRET") or config.get("runway_api_key")
@@ -687,7 +711,7 @@ def studio_main(args, root, config, ffmpeg_path, ffmpeg, captions, stamp):
     lengths = plan.get("shot_lengths", shot_lengths(spec["duration"]))
     chapters = plan.get("chapter_lengths") or [lengths[i:i + 9] for i in range(0, len(lengths), 9)]
     if len(plan["chapters"]) < len(chapters) and not openai:
-        raise ValueError("Run Cyber --api-setup or set OPENAI_API_KEY for custom story planning.")
+        raise ValueError("Run Cyber --login for ChatGPT or Cyber --api-setup for custom story planning.")
     use_runway = args.video_backend == "runway" or (args.resume and plan.get("renderer") == "generative-video")
     if use_runway and not args.plan_only and not runway_key:
         raise ValueError("Set RUNWAYML_API_SECRET for custom motion, use --plan-only, or run --demo --video-backend illustrated.")
@@ -699,9 +723,11 @@ def studio_main(args, root, config, ffmpeg_path, ffmpeg, captions, stamp):
     record = job / "production.json"
     print(f"Job: {job} | {len(lengths)} shots | seed {spec.get('creative', {}).get('seed', 'legacy')}", flush=True)
     model = config["openai_model"]
+    if openai is CHATGPT:
+        phase("PLANNER", "Using your ChatGPT sign-in through Codex")
     if "research" not in spec and "story" not in plan and should_research(spec, args.research):
         phase("RESEARCH", "Looking up primary sources for the script")
-        spec["research"] = gather(openai, config.get("research_model") or model, spec)
+        spec["research"] = gather(None if openai is CHATGPT else openai, config.get("research_model") or model, spec)
         if spec["research"]["status"] != "sourced":
             phase("RESEARCH", "Source lookup unavailable. Continuing with conservative factual claims")
         save_json(record, plan)

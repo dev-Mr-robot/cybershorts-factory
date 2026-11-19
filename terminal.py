@@ -6,7 +6,7 @@ import re
 import sys
 
 from library import phase
-from api_setup import active_key, check, setup
+from api_setup import planning_access, check, open_key_page, setup
 from random_stories import choose_genre, genre_in
 
 BANNER = r"""
@@ -112,7 +112,7 @@ def conversation(args, root, config, generate):
             continue
         if command in {"help", "menu"}:
             print('Try "Create a 30-second Hindi horror story in anime style". Afterward say "Make it longer".')
-            print("Commands: demo, random, history, settings, api setup, api check, new, exit")
+            print("Commands: demo, random, history, settings, api open, api setup, api check, new, exit")
             continue
         if command in {"new", "start over"}:
             prior = None
@@ -130,6 +130,9 @@ def conversation(args, root, config, generate):
             print("Hindi | Original Phishing pilot format | 1080×1920 portrait by default")
             print(root / "videos")
             continue
+        if command in {"api open", "open api"}:
+            open_key_page()
+            continue
         if command in {"api setup", "setup api", "api check", "check api"}:
             try:
                 if "setup" in command:
@@ -142,7 +145,7 @@ def conversation(args, root, config, generate):
         run = copy.copy(args)
         run.studio = False
         run.offline = run.offline or "offline" in command.split()
-        openai = "" if run.offline else active_key(config)
+        openai = "" if run.offline else planning_access(config)
         if command == "demo":
             run.demo = True
         else:
@@ -169,7 +172,7 @@ def conversation(args, root, config, generate):
                     continue
             if request["random"] and not openai:
                 if request["language"] != "Hindi":
-                    print("The local story bank is in Hindi. Use api setup to generate another language.")
+                    print("The local story bank is in Hindi. Run Cyber --login or use api setup to generate another language.")
                     continue
                 run.random = True
                 run.genre = request.get("genre")
@@ -177,7 +180,7 @@ def conversation(args, root, config, generate):
                 if request["revision"] and (run.genre in (None, "any", request.get("last_local_genre"))):
                     run.local_story = request.get("last_local_story")
             elif not openai:
-                print("Custom prompts need an OpenAI key. Type api setup to add one, or random for local stories by genre.")
+                print("Custom prompts need ChatGPT sign-in or an API key. Run Cyber --login, type api setup, or use random for local stories.")
                 continue
             else:
                 run.prompt = request["idea"]

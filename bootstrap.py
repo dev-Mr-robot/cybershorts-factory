@@ -11,15 +11,17 @@ ROOT = Path(__file__).resolve().parent
 
 
 def codex_login():
+    from chatgpt_planner import login_env
+
     codex = shutil.which("codex")
     if not codex:
         print("Codex CLI is unavailable. Cyber can still launch.", file=sys.stderr)
         print("https://developers.openai.com/codex/cli/", file=sys.stderr)
         return
     try:
-        subprocess.run([codex, "login"], check=False)
-    except OSError:
-        print("Codex sign-in could not start. Cyber can still launch.", file=sys.stderr)
+        subprocess.run([codex, "login"], env=login_env(), check=False)
+    except (OSError, KeyboardInterrupt):
+        print("Codex sign-in did not finish. Cyber can still launch.", file=sys.stderr)
 
 
 def dependencies(args):
@@ -59,7 +61,9 @@ def main():
     if "--login" in args:
         args.remove("--login")
         codex_login()
-    informational = any(flag in args for flag in ("--help", "-h", "--list-styles", "--api-check", "--api-setup"))
+        if "--chatgpt" not in args:
+            args.append("--chatgpt")
+    informational = any(flag in args for flag in ("--help", "-h", "--list-styles", "--api-check", "--api-setup", "--api-open"))
     python = sys.executable if informational or "--no-install" in args else dependencies(args)
     if "--setup" in args or "--setup-all" in args:
         return 0

@@ -16,7 +16,7 @@ import wave
 from content import BEATS, generate, key
 from library import finish, job_name, slug
 from terminal import choose_duration, conversation, interpret
-from api_setup import active_key, check as api_check, setup as api_setup
+from api_setup import planning_access, check as api_check, open_key_page, setup as api_setup
 from random_stories import choose_genre, genre_in
 from studio import studio_main, studio_parser
 
@@ -268,6 +268,8 @@ def main():
     topic_option.add_argument("--auto", action="store_true", help="Pick a fresh topic without prompting")
     parser.add_argument("--offline-voice", action="store_true", help="Use Windows Speech for an offline render")
     parser.add_argument("--api-setup", action="store_true")
+    parser.add_argument("--chatgpt", action="store_true", help="Prefer ChatGPT sign-in through Codex")
+    parser.add_argument("--api-open", action="store_true", help="Open the OpenAI project API key page")
     parser.add_argument("--api-check", action="store_true")
     studio_parser(parser)
     args = parser.parse_args()
@@ -284,13 +286,15 @@ def main():
     library_root = (ROOT / "videos").resolve()
     if not library_root.is_relative_to(ROOT.resolve()):
         raise ValueError("The videos folder must be inside the application directory.")
-    config.update(output_folder="videos", named_library=True)
+    config.update(output_folder="videos", named_library=True, prefer_chatgpt=args.chatgpt)
+    if args.api_open:
+        return open_key_page()
     if args.api_setup:
         return api_setup(ROOT, config)
     if args.api_check:
-        return api_check(config)
+        raise SystemExit(0 if api_check(config) else 1)
     if args.random and not args.local_animation and not args.demo and not args.studio and sys.stdin.isatty():
-        local = args.offline or not active_key(config)
+        local = args.offline or not planning_access(config)
         if not args.genre:
             args.genre = genre_in(args.prompt or args.topic or "") or choose_genre(local=local)
             if args.genre is None:
@@ -299,7 +303,7 @@ def main():
             args.duration = choose_duration(local=local)
             if args.duration is None:
                 return
-    if len(sys.argv) == 1 or args.studio:
+    if len(sys.argv) == 1 or sys.argv[1:] == ["--chatgpt"] or args.studio:
         return conversation(args, ROOT, config, lambda run: studio_main(
             run, ROOT, config, ffmpeg_path, ffmpeg, captions, stamp))
 
