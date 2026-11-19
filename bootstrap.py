@@ -1,6 +1,7 @@
 """Launch from the application directory and provision local Python dependencies."""
 import hashlib
 import importlib.util
+import json
 import os
 from pathlib import Path
 import shutil
@@ -22,6 +23,24 @@ def codex_login():
         subprocess.run([codex, "login"], env=login_env(), check=False)
     except (OSError, KeyboardInterrupt):
         print("Codex sign-in did not finish. Cyber can still launch.", file=sys.stderr)
+
+
+def needs_login(args):
+    if not sys.stdin.isatty() or "--offline" in args or args not in ([], ["--studio"], ["--chatgpt"]):
+        return False
+    if os.getenv("OPENAI_API_KEY", "").strip() and "--chatgpt" not in args:
+        return False
+    if "--chatgpt" not in args:
+        for name in ("config.local.json", "config.json"):
+            try:
+                config = json.loads((ROOT / name).read_text(encoding="utf-8-sig"))
+                if str(config.get("openai_api_key") or "").strip():
+                    return False
+            except (OSError, ValueError, AttributeError):
+                continue
+    from chatgpt_planner import signed_in
+
+    return not signed_in()
 
 
 def dependencies(args):
@@ -58,8 +77,12 @@ def main():
     if sys.version_info < (3, 11):
         print("Cyber requires Python 3.11 or newer.", file=sys.stderr)
         return 2
-    if "--login" in args:
+    explicit_login = "--login" in args
+    if explicit_login:
         args.remove("--login")
+    if explicit_login or needs_login(args):
+        if not explicit_login:
+            print("[LOGIN] Opening ChatGPT sign-in. You can cancel to continue with local stories.", flush=True)
         codex_login()
         if "--chatgpt" not in args:
             args.append("--chatgpt")
