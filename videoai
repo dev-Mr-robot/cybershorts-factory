@@ -1,7 +1,5 @@
 #!/usr/bin/env sh
 set -eu
-app_dir=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)
-if [ -x "$app_dir/.venv/bin/python" ]; then
-    exec "$app_dir/.venv/bin/python" "$app_dir/main.py" "$@"
-fi
-exec "${PYTHON:-python3}" "$app_dir/main.py" "$@"
+entry=$(readlink -f -- "$0")
+app_dir=$(CDPATH='' cd -- "$(dirname -- "$entry")" && pwd)
+exec "$app_dir/Cyber" "$@"

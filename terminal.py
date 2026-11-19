@@ -1,4 +1,5 @@
 """Prompt-first interactive terminal, using Studio for actual creation."""
+import asyncio
 import copy
 import json
 import os
@@ -6,13 +7,16 @@ import re
 import sys
 
 from library import phase
-from api_setup import active_key, check, open_key_page, setup
+from api_setup import active_key, check, planning_access
+from chatgpt_planner import HELP, INSTALL, account, signed_in
+from cloud import video_key
+import shutil
 from random_stories import choose_genre, genre_in
 import player
 
 BANNER = r"""
 +--------------------------------------------------+
-|   V I D E O A I   /   C Y B E R S H O R T S      |
+|                SHADOW VIDEO AI                   |
 |   Full-screen pilot animation                   |
 |   Hindi by default  /  Cinematic 2D               |
 +--------------------------------------------------+
@@ -95,9 +99,56 @@ def latest_jobs(root):
     return sorted(root.glob("videos/**/metadata.json"), key=lambda item: item.stat().st_mtime, reverse=True)
 
 
+def service_status(config, verify=False):
+    logged_in = signed_in()
+    print("[CHATGPT] Signed in through Codex." if logged_in else f"[CHATGPT] Signed out. {HELP}")
+    if not shutil.which("codex"):
+        print(f"[CHATGPT] {INSTALL}")
+    if active_key(config):
+        print("[OPENAI] Managed Responses API access configured.")
+    text_ok = check(config) if verify else bool(logged_in or active_key(config))
+    runway = video_key(config)
+    video_ok = False
+    if runway and verify:
+        from studio import check_video_provider
+        try:
+            video_ok = check_video_provider(runway)
+        except (OSError, RuntimeError, ValueError) as error:
+            print(f"[RUNWAY] {error}")
+    elif runway:
+        print("[RUNWAY] Managed connection configured. Run videoai --online-check to verify it.")
+    else:
+        print("[RUNWAY] Disconnected. A separate funded Runway project is required for this integration.")
+    print("[IMAGES] Runway character references use the same project. Image generation is verified during rendering.")
+    voice_ok = False
+    if verify:
+        try:
+            import edge_tts
+            voices = asyncio.run(asyncio.wait_for(edge_tts.list_voices(), timeout=15))
+            voice_ok = any(voice.get("Locale") == "hi-IN" for voice in voices)
+            print("[VOICE] Edge TTS lists Hindi voices." if voice_ok else "[VOICE] Hindi voice unavailable.")
+        except (ImportError, OSError, RuntimeError, TimeoutError, ValueError) as error:
+            print(f"[VOICE] Edge TTS voice check failed ({type(error).__name__}).")
+    else:
+        print("[VOICE] Edge TTS uses an online connection and requires no account.")
+    return text_ok and (not verify or (video_ok and voice_ok))
+
+
 def conversation(args, root, config, generate):
     colored = sys.stdout.isatty() and "NO_COLOR" not in os.environ and os.environ.get("TERM") != "dumb"
     print(f"\033[36;1m{BANNER}\033[0m" if colored else BANNER)
+    if not args.offline and sys.stdin.isatty() and not planning_access(config):
+        if shutil.which("codex"):
+            print("[CHATGPT] Press Enter to sign in with your browser. Type device for remote login, or skip.")
+            try:
+                choice = input("Sign in > ").strip().casefold()
+            except (EOFError, KeyboardInterrupt):
+                print()
+                return
+            if choice in {"", "device"} and account("login", device=choice == "device"):
+                service_status(config, verify=True)
+        else:
+            print(f"[CHATGPT] {INSTALL}")
     print("नमस्ते! आज कैसी वीडियो बनानी है?")
     print("Describe a video, or type help, random, demo, history, settings, new or exit.")
     prior = None
@@ -114,7 +165,7 @@ def conversation(args, root, config, generate):
             continue
         if command in {"help", "menu"}:
             print('Try "Create a 30-second Hindi horror story in anime style". Afterward say "Make it longer".')
-            print("Commands: demo, random, history, settings, api open, api setup, api check, new, exit")
+            print("Commands: demo, random, history, settings, login, login device, logout, status, new, exit")
             continue
         if command in {"new", "start over"}:
             prior = None
@@ -135,22 +186,20 @@ def conversation(args, root, config, generate):
             print("Hindi | Original Phishing pilot format | 1080×1920 portrait by default")
             print(root / "videos")
             continue
-        if command in {"api open", "open api"}:
-            open_key_page()
-            continue
-        if command in {"api setup", "setup api", "api check", "check api"}:
-            try:
-                if "setup" in command:
-                    setup(root, config)
-                else:
-                    check(config)
-            except (OSError, ValueError) as error:
-                print(f"API setup: {error}")
+        if command in {"login", "login device", "logout", "status", "online check"}:
+            if command == "status":
+                service_status(config)
+            elif command == "online check":
+                service_status(config, verify=True)
+            elif command == "logout":
+                account("logout")
+            elif account("login", device=command == "login device"):
+                service_status(config, verify=True)
             continue
         run = copy.copy(args)
         run.studio = False
         run.offline = run.offline or "offline" in command.split()
-        openai = "" if run.offline else active_key(config)
+        openai = "" if run.offline else planning_access(config)
         if command == "demo":
             run.demo = True
         else:
@@ -177,7 +226,7 @@ def conversation(args, root, config, generate):
                     continue
             if request["random"] and run.offline:
                 if request["language"] != "Hindi":
-                    print("The local story bank is in Hindi. Use api setup to connect an OpenAI project key.")
+                    print("The local story bank is in Hindi. Type login to use ChatGPT for other languages.")
                     continue
                 run.random = True
                 run.genre = request.get("genre")
@@ -185,7 +234,7 @@ def conversation(args, root, config, generate):
                 if request["revision"] and (run.genre in (None, "any", request.get("last_local_genre"))):
                     run.local_story = request.get("last_local_story")
             elif not openai:
-                print("Online generation needs OPENAI_API_KEY and VIDEO_PROVIDER_API_KEY. Type api setup for help, or offline random for the local story bank.")
+                print(f"{HELP} You can also type login here.")
                 continue
             else:
                 run.prompt = request["idea"]
@@ -202,6 +251,16 @@ def conversation(args, root, config, generate):
                     if not run.cast_from:
                         print("Create a pilot production first to reuse its character designs.")
                         continue
+        if (openai and not run.demo and not run.plan_only and run.video_backend == "auto"
+                and not video_key(config) and sys.stdin.isatty()):
+            try:
+                choice = input("Runway disconnected. Render with the original illustrated pilot? [y/N] ").strip().casefold()
+            except (EOFError, KeyboardInterrupt):
+                print()
+                continue
+            if choice not in {"y", "yes", "हाँ"}:
+                continue
+            run.video_backend = "pilot"
         try:
             phase("START", "Preparing production")
             before = player.latest(root)

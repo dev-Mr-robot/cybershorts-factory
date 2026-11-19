@@ -44,9 +44,7 @@ def main():
     if sys.version_info < (3, 11):
         print("Cyber requires Python 3.11 or newer.", file=sys.stderr)
         return 2
-    if "--login" in args:
-        args[args.index("--login")] = "--api-open"
-    informational = any(flag in args for flag in ("--help", "-h", "--list-styles", "--api-check", "--api-setup", "--api-open", "--online-check", "--player-check", "--play"))
+    informational = any(flag in args for flag in ("--help", "-h", "--list-styles", "--api-check", "--login", "--logout", "--auth-status", "--online-check", "--player-check", "--play"))
     environment = ROOT / ".venv" / ("Scripts/python.exe" if os.name == "nt" else "bin/python")
     if informational or "--no-install" in args:
         python = str(environment) if environment.is_file() else sys.executable

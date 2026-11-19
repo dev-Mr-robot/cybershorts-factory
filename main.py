@@ -15,9 +15,10 @@ import wave
 
 from content import BEATS, generate, key
 from library import finish, job_name, slug
-from terminal import choose_duration, conversation, interpret
-from cloud import load_env, video_key
-from api_setup import active_key, check as api_check, open_key_page, setup as api_setup
+from terminal import choose_duration, conversation, interpret, service_status
+from cloud import load_env
+from api_setup import check as api_check, planning_access
+from chatgpt_planner import account
 from random_stories import choose_genre, genre_in
 from studio import studio_main, studio_parser
 
@@ -268,15 +269,20 @@ def main():
     topic_option.add_argument("--topic", help="Cybersecurity topic")
     topic_option.add_argument("--auto", action="store_true", help="Pick a fresh topic without prompting")
     parser.add_argument("--offline-voice", action="store_true", help="Use Windows Speech for an offline render")
-    parser.add_argument("--api-setup", action="store_true")
+    auth = parser.add_mutually_exclusive_group()
+    auth.add_argument("--login", action="store_true", help="Sign in with ChatGPT in your browser")
+    auth.add_argument("--logout", action="store_true", help="Sign out of this application's ChatGPT session")
+    auth.add_argument("--auth-status", action="store_true", help="Show configured account connections")
+    parser.add_argument("--device-auth", action="store_true", help="Use a device code with --login")
     parser.add_argument("--play", nargs="?", const="", metavar="MP4", help="Play a file or the latest export")
     parser.add_argument("--subtitles", type=Path, help="Optional external SRT for --play")
     parser.add_argument("--player-check", action="store_true")
     parser.add_argument("--online-check", action="store_true")
-    parser.add_argument("--api-open", action="store_true", help="Open the OpenAI project API key page")
     parser.add_argument("--api-check", action="store_true")
     studio_parser(parser)
     args = parser.parse_args()
+    if args.device_auth and not args.login:
+        parser.error("--device-auth requires --login")
     if args.demo_story:
         args.demo = True
     if args.prompt:
@@ -297,23 +303,20 @@ def main():
         if args.player_check:
             return player.check()
         return player.play(Path(args.play) if args.play else player.latest(ROOT), args.subtitles)
-    if args.online_check:
-        from studio import check_video_provider
-        ok = api_check(config)
-        try:
-            check_video_provider(video_key(config))
-        except (RuntimeError, ValueError, OSError) as error:
-            print(f"[RUNWAY] {error}")
-            ok = False
+    if args.login:
+        if not account("login", device=args.device_auth):
+            raise SystemExit(1)
+        service_status(config, verify=True)
+        return
+    if args.logout:
+        raise SystemExit(0 if account("logout") else 1)
+    if args.auth_status or args.online_check:
+        ok = service_status(config, verify=args.online_check)
         raise SystemExit(0 if ok else 1)
-    if args.api_open:
-        return open_key_page()
-    if args.api_setup:
-        return api_setup(ROOT, config)
     if args.api_check:
         raise SystemExit(0 if api_check(config) else 1)
     if args.random and not args.local_animation and not args.demo and not args.studio and sys.stdin.isatty():
-        local = args.offline or not active_key(config)
+        local = args.offline or not planning_access(config)
         if not args.genre:
             args.genre = genre_in(args.prompt or args.topic or "") or choose_genre(local=local)
             if args.genre is None:

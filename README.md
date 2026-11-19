@@ -1,12 +1,12 @@
-# CyberShorts Factory
+# Shadow Video AI
 
-Describe a video in natural language. OpenAI's Responses API writes and checks the storyboard. Runway Gen‑4.5 generates moving clips, Edge TTS supplies the voices, and FFmpeg assembles the MP4. Hindi and vertical 1080×1920 are defaults. The previous 2D pilot renderer remains available explicitly.
+Describe a video in natural language. ChatGPT via Codex writes and checks the storyboard. Runway Gen‑4.5 generates moving clips, Edge TTS supplies the voices, and FFmpeg assembles the MP4. Hindi and vertical 1080×1920 are defaults. The previous 2D pilot renderer remains available explicitly.
 
 ## Install on Kali
 
 ```sh
 sh install_kali.sh
-Cyber
+videoai
 ```
 
 The installer lists missing packages and asks before using APT. Python packages go into the app's own virtual environment. If the installer says the launcher folder needs to be added to PATH, run the command it prints. On other Linux distributions use `sh install.sh`. On Windows use `powershell -NoProfile -File install.ps1`.
@@ -21,18 +21,21 @@ sh install.sh
 
 Kali's [Python environment guidance](https://www.kali.org/docs/general-use/python3-external-packages/) recommends isolating Python packages. A desktop session is needed for the video window.
 
-## Configure online generation
+## Sign in
 
-Copy `.env.example` to `.env` and add your keys locally:
+Install the [official Codex CLI](https://developers.openai.com/codex/cli/) and make sure `codex` is on PATH. Then run:
 
-```dotenv
-OPENAI_API_KEY=
-VIDEO_PROVIDER_API_KEY=
+```sh
+videoai
 ```
 
-Use an [OpenAI project API key](https://platform.openai.com/api-keys) and a [Runway API key](https://dev.runwayml.com/). Exported variables take precedence over `.env`. `RUNWAYML_API_SECRET` is accepted as an alternative video-key variable. Edge TTS needs internet access and uses no TTS key. Keep `.env` out of Git.
+Press Enter at the sign-in prompt and approve the login in your browser. On a remote shell, type `device` or run `videoai --login --device-auth`. Device sign-in may need to be enabled in your ChatGPT or workspace security settings. On Windows, use `Cyber.cmd` in place of `videoai`.
 
-Run `Cyber --online-check` to test OpenAI JSON generation and read the Runway project's credit balance. A positive balance doesn't establish that there are enough credits for your whole film. OpenAI API billing and Runway's [video credits](https://docs.dev.runwayml.com/guides/pricing/) are separate. `Cyber --api-open` opens the OpenAI API key page.
+The official Codex CLI stores and refreshes the account session in an app-specific state directory. Type `status` to see connections, `online check` to test them, and `logout` to sign out of Shadow Video AI. The equivalent flags are `--auth-status`, `--online-check`, and `--logout`.
+
+ChatGPT sign-in enables screenplay and story review through Codex, subject to the account's plan and usage limits. Live source lookup uses a separately managed OpenAI Platform connection when available. Edge TTS uses the internet and needs no account.
+
+The CLI's Runway adapter uses the [Runway developer API](https://docs.dev.runwayml.com/guides/setup/). A deployment administrator can provide a funded project via `VIDEO_PROVIDER_API_KEY` (or `RUNWAYML_API_SECRET`). A managed `OPENAI_API_KEY` is also supported for existing deployments. End users are never prompted for keys. Runway's [separate browser-authorized media connector](https://help.runwayml.com/hc/en-us/articles/51931843164691-Connecting-to-Runway-MCP) can generate media inside supported clients, but is not wired to this CLI's clip assembler. Choose the illustrated pilot when the CLI has no Runway connection.
 
 ## Create and watch
 
