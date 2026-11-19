@@ -84,30 +84,30 @@ def draw_phone(frame, event, local, phone=None):
                   outline="#fff4c9", width=4)
 
 @lru_cache(maxsize=180)
-def actor(name, mood, gesture, mouth, stride, height):
-    art = sprite(name, mood, gesture, mouth, stride)
+def actor(name, mood, gesture, mouth, stride, height, design=None):
+    art = sprite(name, mood, gesture, mouth, stride, design)
     return art.resize((round(art.width * height / art.height), height), Image.Resampling.BILINEAR)
 
-def place(frame, name, center, top, height, shot, local, talking, walk=False, motion_speaker=None):
+def place(frame, name, center, top, height, shot, local, talking, walk=False, motion_speaker=None, design=None):
     active = name == shot.speaker
     mood = shot.mood if active else ("shock" if shot.event == "lock" else "confused")
     gesture = shot.gesture if active else "down"
     mouth = (1 + int(local * 10) % 2) if name == (motion_speaker or shot.speaker) and talking else 0
     stride = (8 if int(local * 5) % 2 else -8) if walk else 0
-    art = actor(name, mood, gesture, mouth, stride, height)
+    art = actor(name, mood, gesture, mouth, stride, height, design)
     bob = round(math.sin(local * (12 if walk else 4.0)) * (6 if walk else 3))
     frame.paste(art, (round(center - art.width / 2), top + bob), art)
 
 def frame_at(background, shot, index, local, length, spoken, caption, *,
              partner=None, count=10, label="PORT NAGAR  /  PHISHING",
-             speaker_label=None, phone=None, motion_speaker=None, evidence=None):
+             speaker_label=None, phone=None, motion_speaker=None, evidence=None, designs=None):
     cut = round(13 * local / length)
     box = (36 + cut, 31 + cut, background.width - 36 - cut, background.height - 31 - cut)
     frame = background.resize((W, H), Image.Resampling.BILINEAR, box)
     if shot.event == "lock" and local < 0.32:
         frame = Image.blend(frame, Image.new("RGB", frame.size, "#b71e45"), 0.38 * (1 - local / 0.32))
     def draw_actor(name, center, top, height, cue, time, audio, walk=False):
-        place(frame, name, center, top, height, cue, time, audio, walk, motion_speaker)
+        place(frame, name, center, top, height, cue, time, audio, walk, motion_speaker, designs.get(name) if designs else None)
 
     if shot.camera == "single":
         draw_actor( shot.speaker, 272, 191, 1160, shot, local, spoken)
@@ -141,7 +141,8 @@ def frame_at(background, shot, index, local, length, spoken, caption, *,
         d.text((267, 209), "MISSION FAILED", font=font(44), fill="#ff7f9e",
                stroke_width=4, stroke_fill="#221026", anchor="mm")
     if caption or speaker_label:
-        color = CAST[motion_speaker or shot.speaker]["accent"]
+        speaker = motion_speaker or shot.speaker
+        color = designs[speaker][-2] if designs and speaker in designs else CAST.get(speaker, CAST["BUNTY"])["accent"]
         d.rounded_rectangle((31, 750, 499, 867), 16, fill="#171427", outline=color, width=2)
         edge = 77 if shot.camera == "phone" else 175
         d.polygon(((edge, 746), (edge + 12, 733), (edge + 26, 751)), fill=color)

@@ -149,20 +149,39 @@ def local_plan(root, genre, seed, duration=None, replay=None):
     if not 24 <= length <= 60:
         raise ValueError("Local stories support 24–60 seconds. Use the API for a custom length.")
     base, remainder = divmod(length, 4)
+    pools = (("Aman", "Tara", "अमन", "तारा"), ("Kabir", "Ira", "कबीर", "इरा"),
+             ("Rohan", "Diya", "रोहन", "दिया"), ("Arjun", "Nila", "अर्जुन", "नीला"))
+    first_name, second_name, first_hi, second_hi = random.Random(str(seed) + identifier).choice(pools)
+    cast_names = [first_name, second_name]
+    locations = {
+        "otp_nahi": ("cafe", "cafe", "cafe", "street"),
+        "saved_site": ("workshop", "workshop", "workshop", "rooftop"),
+        "third_bell": ("hallway", "hallway", "street", "street"),
+        "extra_shadow": ("street", "street", "street", "hallway"),
+        "invisible_hat": ("cafe", "cafe", "cafe", "cafe"),
+        "talking_tea": ("workshop", "workshop", "cafe", "cafe"),
+        "wet_envelope": ("hallway", "hallway", "hallway", "hallway"),
+        "missing_clock": ("workshop", "workshop", "workshop", "workshop"),
+        "borrowed_rain": ("rooftop", "rooftop", "forest", "forest"),
+        "paper_star": ("rooftop", "rooftop", "hallway", "hallway"),
+        "moon_reply": ("space", "space", "workshop", "workshop"),
+        "future_clock": ("workshop", "workshop", "workshop", "cafe"),
+    }[identifier]
     shots = []
     for index, line in enumerate(dialogue):
-        speaker = ("Bunty", "Meera")[index % 2]
+        line = line.replace("मीरा", second_hi).replace("बंटी", first_hi)
+        speaker = cast_names[index % 2]
         phone = {0: first, 1: second}.get(index)
         shots.append({"seconds": base + (index < remainder), "opening": summary, "action": line,
-                      "cast": ["Bunty", "Meera"], "pilot_camera": "phone" if phone else ("wide" if index in (0, 3) else "duo"),
+                      "cast": cast_names, "pilot_set": locations[index], "pilot_camera": "phone" if phone else ("wide" if index in (0, 3) else "duo"),
                       "pilot_phone": phone, "dialogue": [{"speaker": speaker, "line": line,
                           "emotion": ("confused", "serious", "surprised", "happy")[index]}]})
     return {"local_story": identifier, "quality_review": {"status": "passed", "method": "authored"},
             "spec": {"mode": "cyber" if category == "cybersecurity" else "general", "genre": category,
-                     "language": "Hindi", "duration": length, "ratio": "1080:1920"},
+                     "language": "Hindi", "duration": length, "ratio": "1080:1920", "creative": {"seed": seed}},
             "story": {"title": title, "slug": slug(identifier), "style": "2D Cinematic Illustration", "summary": summary,
-                      "cast": [{"name": "Bunty", "tag": "bunty", "gender": "male"},
-                               {"name": "Meera", "tag": "meera", "gender": "female"}]},
+                      "cast": [{"name": first_name, "tag": first_name.casefold(), "gender": "male"},
+                               {"name": second_name, "tag": second_name.casefold(), "gender": "female"}]},
             "shot_lengths": [shot["seconds"] for shot in shots],
             "chapter_lengths": [[shot["seconds"] for shot in shots]], "chapters": [shots],
-            "voice_assignments": {"Bunty": "hi-IN-MadhurNeural", "Meera": "hi-IN-SwaraNeural"}}
+            "voice_assignments": {first_name: "hi-IN-MadhurNeural", second_name: "hi-IN-SwaraNeural"}}

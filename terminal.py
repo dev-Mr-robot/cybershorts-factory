@@ -170,11 +170,11 @@ def conversation(args, root, config, generate):
                 if request["reuse"]:
                     for metadata in latest_jobs(root):
                         source = metadata.parent / "production.json"
-                        if source.exists() and any(metadata.parent.glob("*.jpg")):
+                        if source.is_file() and json.loads(source.read_text(encoding="utf-8")).get("pilot_art"):
                             run.cast_from = source
                             break
                     if not run.cast_from:
-                        print("Create a Runway production first to reuse its cast artwork.")
+                        print("Create a pilot production first to reuse its character designs.")
                         continue
         try:
             phase("START", "Preparing production")

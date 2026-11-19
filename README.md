@@ -2,7 +2,7 @@
 
 ## Default video format
 
-New productions use the actual animated Phishing pilot renderer: its 2D sprite cast, full-screen portrait layout, 24 fps, distinct shot framings, dialogue cards and speech-timed mouths. This is the default for custom stories and `--demo`. Custom screenplay planning uses OpenAI and dialogue uses Edge TTS. Use `--video-backend runway` or `--demo --video-backend illustrated` to explicitly select the older alternate renderers.
+New productions use the actual animated Phishing pilot renderer: its 2D sprite construction, full-screen portrait layout, 24 fps, distinct shot framings, dialogue cards and speech-timed mouths. New productions receive a stable cast design and newly drawn backgrounds for their scene locations. Use `--recurring-cast` for legacy cast identities on custom cyber stories, or `--cast-from path/to/production.json` to reuse an explicitly saved pilot cast. This is the default for custom stories and `--demo`. Custom screenplay planning uses OpenAI and dialogue uses Edge TTS. Use `--video-backend runway` or `--demo --video-backend illustrated` to explicitly select the older alternate renderers.
 
 Before rendering a custom story, Studio reviews what viewers will actually see and hear. If the logic is unclear, it revises the affected chapter and can add time for missing beats. The requested duration is a starting target. Review results and the final timeline are saved in `production.json`. The built-in refund demo uses an authored 60-second walkthrough.
 
@@ -21,7 +21,7 @@ On Windows, run `powershell -NoProfile -File install.ps1` from this folder, then
 
 `Cyber --login` optionally runs the installed Codex CLI's own sign-in flow. Missing Codex or a canceled sign-in leaves Cyber available. Built-in demos need neither Codex sign-in nor an OpenAI API key. Custom scripts and source research use `OPENAI_API_KEY` separately. See the [Codex CLI guide](https://developers.openai.com/codex/cli/).
 
-Describe a story in your own words. Examples include "Make a 30-second Hindi horror story in anime style", "Make it longer", and "Use the same character as my previous video". Interactive settings stay in the conversation. Reuse of a character's saved visual references requires a previous Runway production. Commands include `help`, `menu`, `new`, `random`, `demo`, `history`, `settings`, and `exit`. Use `--cast-from path/to/production.json` for explicit reference reuse.
+Describe a story in your own words. Examples include "Make a 30-second Hindi horror story in anime style", "Make it longer", and "Use the same character as my previous video". Interactive settings stay in the conversation. In the terminal, character reuse uses saved artwork designs from a previous pilot production. Commands include `help`, `menu`, `new`, `random`, `demo`, `history`, `settings`, and `exit`. Use `--cast-from path/to/production.json` for explicit reference reuse.
 
 New renders go inside the application under `videos/` with separate job folders, safe video filenames, scripts, subtitles, per-shot audio and footage, and `metadata.json`. Old files under `output/` are preserved. Custom prompts require an OpenAI key for planning. Runway requires a separate key only when selected explicitly. With no key, `random` draws from a local Hindi story bank and asks for a genre. Finished local stories are skipped until the selected genre runs out. Edge TTS needs internet access.
 

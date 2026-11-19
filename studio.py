@@ -266,7 +266,10 @@ def chapter(key, model, spec, story, index, slots, previous, feedback=None, draf
     speakable phonetic dialogue and translated subtitle; fallback voice will approximate it.
     Draft connected scenes, expressive change within each shot, varied framing and an ending.
 
-    Optional pilot_camera is wide, single, duo or phone. When phone is used, provide pilot_phone
+    Choose pilot_set per scene from street, cafe, workshop, rooftop, forest,
+    station, space, hallway. A continuing conversation should keep the same set.
+    Change location when the action moves. Vary premises, roles, and environments
+    across productions. Optional pilot_camera is wide, single, duo or phone. When phone is used, provide pilot_phone
     as four short English display strings: notification, decision/clue, detail, and action/status.
     For a non-phone shot, pilot_evidence can show a two-string label and an observable
     result or contrast (compact English display text). Use specific visual evidence from the
@@ -650,9 +653,15 @@ def studio_main(args, root, config, ffmpeg_path, ffmpeg, captions, stamp):
             source = args.cast_from.resolve()
             previous = json.loads(source.read_text(encoding="utf-8"))
             cast = previous["story"]["cast"]
-            if not cast or any(not (source.parent / f"{person['tag']}.jpg").is_file() for person in cast):
-                raise ValueError("The previous production must have saved Runway character reference images.")
-            spec.update(count=len(cast), reuse_cast=cast, cast_source=str(source.parent), recurring_cast=False)
+            pilot_designs = previous.get("pilot_art", {}).get("designs", {})
+            if not cast:
+                raise ValueError("The previous production does not contain a cast.")
+            if args.video_backend == "runway" and any(not (source.parent / f"{person['tag']}.jpg").is_file() for person in cast):
+                raise ValueError("Runway cast reuse needs saved reference images.")
+            if args.video_backend != "runway" and not pilot_designs:
+                raise ValueError("Pilot cast reuse needs a production with saved character designs.")
+            spec.update(count=len(cast), reuse_cast=cast, cast_source=str(source.parent), recurring_cast=False,
+                        reuse_pilot_designs=pilot_designs)
         spec["creative"] = creative
         if spec["mode"] == "cyber":
             weights = config.get("content_mix", {"funny": 40, "educational": 40, "serious": 20})

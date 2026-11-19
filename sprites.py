@@ -15,11 +15,13 @@ CAST = {
 
 
 @lru_cache(maxsize=128)
-def sprite(name, mood, gesture, mouth, stride=0):
-    palette = CAST[name]
+def sprite(name, mood, gesture, mouth, stride=0, design=None):
+    palette = CAST.get(name, CAST["BUNTY"])
     skin, light, jacket, shade, hair, accent = (
         palette[key] for key in ("skin", "light", "jacket", "shade", "hair", "accent")
     )
+    if design:
+        hair_style, skin, light, jacket, shade, hair, accent, accessory = design
     image = Image.new("RGBA", (280, 430))
     d = ImageDraw.Draw(image)
 
@@ -40,7 +42,7 @@ def sprite(name, mood, gesture, mouth, stride=0):
     d.line((178, 322, 184 + stride, 392), fill="#737089", width=4)
     d.line((89, 319, 85 - stride, 392), fill="#737089", width=4)
 
-    if name == "MEERA":
+    if name == "MEERA" and not design:
         shape([(80, 102), (61, 125), (65, 212), (101, 206), (104, 116)], hair)
         oval((52, 140, 78, 199), hair)
 
@@ -69,7 +71,7 @@ def sprite(name, mood, gesture, mouth, stride=0):
 
     # Neck, head, rim light and recognizable hairstyles.
     shape([(116, 125), (160, 125), (162, 163), (138, 181), (113, 163)], skin)
-    if name == "PATCH":
+    if name == "PATCH" and not design:
         shape([(73, 132), (66, 55), (95, 16), (145, 7), (197, 35),
                (210, 137), (187, 176), (172, 160), (101, 172)], shade)
     oval((75, 98, 102, 130), skin)
@@ -77,7 +79,27 @@ def sprite(name, mood, gesture, mouth, stride=0):
     shape([(90, 65), (108, 41), (156, 38), (182, 58), (184, 111),
            (173, 143), (149, 158), (121, 151), (96, 131)], skin)
     d.polygon([(104, 63), (143, 49), (154, 61), (116, 75), (105, 119), (99, 107)], fill=light)
-    if name == "BUNTY":
+    if design:
+        if hair_style in {"bob", "braid"}:
+            shape([(78,114),(75,66),(94,42),(139,30),(171,42),(192,70),(195,141),
+                   (178,138),(170,78),(141,57),(118,78),(98,79),(97,126)], hair)
+            if hair_style == "braid":
+                for y in (127,144,160):
+                    oval((78,y,95,y+22),hair,2)
+        elif hair_style == "curls":
+            for x, y in ((91,66),(101,49),(116,41),(136,39),(154,40),(170,49),(182,63)):
+                oval((x-13,y-13,x+15,y+14),hair,3)
+        else:
+            shape([(82,92),(79,59),(97,40),(137,29),(170,41),(190,67),
+                   (182,85),(161,62),(128,61),(101,78),(96,99)],hair)
+            if hair_style == "cap":
+                shape([(79,69),(84,45),(111,32),(149,33),(175,45),(184,65),(208,73),
+                       (180,81),(112,76)],jacket)
+            elif hair_style == "swept":
+                d.line((95,63,136,44,163,45),fill=accent,width=3)
+        if accessory == "stud":
+            oval((83,120,94,131),accent,2)
+    elif name == "BUNTY":
         shape([(84, 92), (79, 53), (102, 34), (117, 12), (127, 29), (156, 15),
                (152, 31), (182, 28), (179, 42), (195, 49), (186, 74),
                (158, 56), (114, 71), (99, 63), (96, 97)], hair)
@@ -107,7 +129,7 @@ def sprite(name, mood, gesture, mouth, stride=0):
             radius = 11 if mood == "shock" else 8
             oval((x - 10, 101 - radius, x + 10, 101 + radius), "#fff4dc", 2)
             oval((x - 2, 98, x + 5, 105), INK, 1)
-    if name == "PATCH":
+    if (design and accessory == "glasses") or (not design and name == "PATCH"):
         for x in (102, 146):
             d.rounded_rectangle((x, 89, x + 28, 111), 4, outline=accent, width=3)
         d.line((131, 97, 146, 97), fill=accent, width=3)

@@ -2,12 +2,13 @@
 import asyncio
 import os
 
-from PIL import Image, ImageOps
+from PIL import Image
 
 import cinematic_demo as graphics
 import episode
 from library import finish, phase, slug
 from providers import save_json
+from pilot_design import background, design_cast, scene_sets, seed_for
 
 
 def render_plan(plan, tool, ffmpeg, captions, stamp, root, job, config):
@@ -22,30 +23,52 @@ def render_plan(plan, tool, ffmpeg, captions, stamp, root, job, config):
     if "voice_assignments" not in plan:
         cast = story | {"cast": [person for person in story["cast"] if person["name"] in spoken]}
         plan["voice_assignments"] = asyncio.run(select_voices(spec, cast, "Narrator" in spoken))
-    slots = tuple(episode.CAST)
-    avatars = {name: slots[i % len(slots)] for i, name in enumerate(names)}
-    avatars.setdefault("Narrator", slots[0])
+    persisted = plan.get("pilot_art")
+    if not persisted:
+        story_seed = spec.get("creative", {}).get("seed")
+        seed = seed_for(story_seed if story_seed is not None else job.name, story["title"])
+        cast_names = list(dict.fromkeys(names + (["Narrator"] if "Narrator" in spoken else []))) or ["Narrator"]
+        custom = [name for name in cast_names if not (spec.get("recurring_cast") and name.upper() in episode.CAST)]
+        designs = design_cast(custom, seed)
+        designs.update({name: design for name, design in spec.get("reuse_pilot_designs", {}).items() if name in designs})
+        persisted = plan["pilot_art"] = {
+            "seed": seed,
+            "designs": designs,
+            "locations": scene_sets(shots, spec.get("genre") or ("cybersecurity" if spec["mode"] == "cyber" else None), seed),
+        }
+    designs = {name: tuple(values) for name, values in persisted["designs"].items()}
+    avatars = {name: name if name in designs else name.upper() for name in names}
+    avatars.setdefault("Narrator", "Narrator" if "Narrator" in designs else "BUNTY")
     plan["renderer"] = "original-phishing-pilot"
+    spec.update(ratio="1080:1920", normalize_video_pts=True, captions_in_frames=True)
     save_json(job / "production.json", plan)
     if spec.get("research"):
         save_json(job / "sources.json", spec["research"])
     save_json(job / "character-design.json", [
-        person | {"pilot_sprite": avatars[person["name"]]} for person in story["cast"]])
-    with Image.open(root / "assets" / "story" / "city.png") as image:
-        background = ImageOps.fit(image.convert("RGB"), (660, 1050))
+        person | {"pilot_sprite": avatars[person["name"]], "pilot_design": designs.get(avatars[person["name"]])}
+        for person in story["cast"]])
+    sets = job / "sets"
+    sets.mkdir(exist_ok=True)
+    backgrounds = {}
+    for location in set(persisted["locations"]):
+        path = sets / (location + ".png")
+        if not path.exists():
+            temporary = path.with_suffix(".tmp")
+            background(location, persisted["seed"]).save(temporary, format="PNG")
+            temporary.replace(path)
+        with Image.open(path) as image:
+            backgrounds[location] = image.convert("RGB")
     scratch = job / "graphics"
     scratch.mkdir(exist_ok=True)
     graphics.TEXT_RENDERER = (ffmpeg, tool, scratch)
     graphics.hindi_mask.cache_clear()
-    spec["ratio"] = "1080:1920"
-    spec["normalize_video_pts"] = True
-    spec["captions_in_frames"] = True
     label = slug(story.get("slug") or story["title"], "animated story").replace("_", " ").upper()
     for index, shot in enumerate(shots):
         folder = job / f"shot{index + 1:04d}"
         folder.mkdir(exist_ok=True)
         phase("PILOT", f"Animating shot {index + 1}/{len(shots)} at 24 fps")
         source = folder / "motion.mp4"
+        plate = backgrounds[persisted["locations"][index]]
 
         def animate(cues, windows):
             speakers = shot["cast"] or names
@@ -72,16 +95,16 @@ def render_plan(plan, tool, ffmpeg, captions, stamp, root, job, config):
                 emotion = next((item.get("emotion") for item in shot["dialogue"] if item["speaker"] == default), None)
                 mood = {"happy": "happy", "sarcastic": "happy", "angry": "angry", "scared": "shock",
                         "surprised": "shock"}.get(emotion, "confused")
-                avatar = avatars.get(default, slots[0])
+                avatar = avatars.get(default, avatars["Narrator"])
                 secondary = next((avatars[name] for name in speakers if name in avatars and avatars[name] != avatar), None)
                 safe_camera = camera if secondary or camera in {"phone", "single"} else "single"
                 gesture = "phone" if safe_camera == "phone" else ("point" if index % 2 else "down")
                 beat = episode.Shot(avatar, "", safe_camera, mood, gesture, "custom", 1)
-                picture = episode.frame_at(background, beat, index, t, shot["seconds"], bool(line),
+                picture = episode.frame_at(plate, beat, index, t, shot["seconds"], bool(line),
                                            "", partner=secondary, count=len(shots), label=label,
                                            speaker_label=slug(current, "speaker").upper() if line else None,
                                            phone=phone, motion_speaker=avatars.get(current, avatar),
-                                           evidence=evidence).convert("RGBA")
+                                           evidence=evidence, designs=designs).convert("RGBA")
                 if line:
                     for i, text in enumerate(line.splitlines()[:2]):
                         graphics.put_hindi(picture, text.replace(chr(92), "/").replace("{", "(").replace("}", ")"),
