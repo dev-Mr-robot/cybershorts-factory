@@ -6,7 +6,7 @@ if ! grep -Eq '^ID="?kali"?$' /etc/os-release 2>/dev/null; then
     exit 1
 fi
 missing=""
-for package in python3 python3-venv ffmpeg mpv fonts-noto-core; do
+for package in python3 python3-venv ffmpeg mpv fonts-noto-core curl; do
     state=$(dpkg-query -W -f='${db:Status-Status}' "$package" 2>/dev/null || true)
     [ "$state" = installed ] || missing="$missing $package"
 done
@@ -24,6 +24,15 @@ if [ -n "$missing" ]; then
         sudo apt-get update
         sudo apt-get install $missing
     fi
+fi
+if ! command -v codex >/dev/null 2>&1 && [ ! -x "$HOME/.local/bin/codex" ]; then
+    printf '%s\n' 'Installing the official Codex CLI for ChatGPT sign-in.'
+    codex_installer=$(mktemp)
+    trap 'rm -f -- "$codex_installer"' EXIT
+    curl --fail --silent --show-error --location https://chatgpt.com/codex/install.sh -o "$codex_installer"
+    sh "$codex_installer"
+    rm -f -- "$codex_installer"
+    trap - EXIT
 fi
 sh "$app_dir/install.sh"
 test -x "$app_dir/.venv/bin/python" || python3 -m venv "$app_dir/.venv"

@@ -8,10 +8,9 @@ import sys
 
 from library import phase
 from api_setup import active_key, check, planning_access
-from chatgpt_planner import HELP, INSTALL, account, signed_in
+from chatgpt_planner import HELP, INSTALL, account, codex_executable, signed_in
 from cloud import video_key
-import shutil
-from random_stories import choose_genre, genre_in
+from random_stories import genre_in
 import player
 
 BANNER = r"""
@@ -102,13 +101,13 @@ def latest_jobs(root):
 def service_status(config, verify=False):
     logged_in = signed_in()
     print("[CHATGPT] Signed in through Codex." if logged_in else f"[CHATGPT] Signed out. {HELP}")
-    if not shutil.which("codex"):
+    if not codex_executable():
         print(f"[CHATGPT] {INSTALL}")
     if active_key(config):
         print("[OPENAI] Managed Responses API access configured.")
     text_ok = check(config) if verify else bool(logged_in or active_key(config))
     runway = video_key(config)
-    video_ok = False
+    video_ok = not runway
     if runway and verify:
         from studio import check_video_provider
         try:
@@ -118,8 +117,9 @@ def service_status(config, verify=False):
     elif runway:
         print("[RUNWAY] Managed connection configured. Run videoai --online-check to verify it.")
     else:
-        print("[RUNWAY] Disconnected. A separate funded Runway project is required for this integration.")
-    print("[IMAGES] Runway character references use the same project. Image generation is verified during rendering.")
+        print("[VIDEO] Full-screen illustrated animation available. Account-only generative video is unavailable.")
+    if runway:
+        print("[IMAGES] Managed Runway image generation is verified during rendering.")
     voice_ok = False
     if verify:
         try:
@@ -138,7 +138,7 @@ def conversation(args, root, config, generate):
     colored = sys.stdout.isatty() and "NO_COLOR" not in os.environ and os.environ.get("TERM") != "dumb"
     print(f"\033[36;1m{BANNER}\033[0m" if colored else BANNER)
     if not args.offline and sys.stdin.isatty() and not planning_access(config):
-        if shutil.which("codex"):
+        if codex_executable():
             print("[CHATGPT] Press Enter to sign in with your browser. Type device for remote login, or skip.")
             try:
                 choice = input("Sign in > ").strip().casefold()
@@ -216,14 +216,6 @@ def conversation(args, root, config, generate):
                     break
             request = interpret(text, prior)
             prior = request
-            if request["random"] and not request.get("genre"):
-                request["genre"] = choose_genre(local=run.offline)
-                if request["genre"] is None:
-                    continue
-            if request["duration"] is None and (openai or run.offline):
-                request["duration"] = choose_duration(local=run.offline)
-                if request["duration"] is None:
-                    continue
             if request["random"] and run.offline:
                 if request["language"] != "Hindi":
                     print("The local story bank is in Hindi. Type login to use ChatGPT for other languages.")
@@ -251,16 +243,6 @@ def conversation(args, root, config, generate):
                     if not run.cast_from:
                         print("Create a pilot production first to reuse its character designs.")
                         continue
-        if (openai and not run.demo and not run.plan_only and run.video_backend == "auto"
-                and not video_key(config) and sys.stdin.isatty()):
-            try:
-                choice = input("Runway disconnected. Render with the original illustrated pilot? [y/N] ").strip().casefold()
-            except (EOFError, KeyboardInterrupt):
-                print()
-                continue
-            if choice not in {"y", "yes", "हाँ"}:
-                continue
-            run.video_backend = "pilot"
         try:
             phase("START", "Preparing production")
             before = player.latest(root)

@@ -28,8 +28,17 @@ def login_env():
     return env
 
 
-def signed_in():
+def codex_executable():
     executable = shutil.which("codex")
+    if not executable and os.name != "nt":
+        candidate = Path.home() / ".local" / "bin" / "codex"
+        if candidate.is_file() and os.access(candidate, os.X_OK):
+            executable = str(candidate)
+    return executable
+
+
+def signed_in():
+    executable = codex_executable()
     if not executable:
         return False
     try:
@@ -41,7 +50,7 @@ def signed_in():
 
 
 def account(action, device=False):
-    executable = shutil.which("codex")
+    executable = codex_executable()
     if not executable:
         print(f"[CHATGPT] {INSTALL}")
         return False

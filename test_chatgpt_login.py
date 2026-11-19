@@ -7,6 +7,7 @@ from unittest.mock import patch
 
 import chatgpt_planner as auth
 from providers import ProviderConnectionError
+from studio import select_video_backend
 
 
 class LoginTests(unittest.TestCase):
@@ -50,3 +51,14 @@ class LoginTests(unittest.TestCase):
                 self.assertNotIn("private-value", str(failure.exception))
                 self.assertTrue(auth.account("logout"))
                 self.assertFalse(auth.signed_in())
+
+    def test_account_only_uses_pilot_without_requesting_provider_access(self):
+        with patch("studio.check_video_provider") as check:
+            self.assertEqual(select_video_backend("auto", ""), "pilot")
+            check.assert_not_called()
+
+    def test_unavailable_managed_video_falls_back_only_in_auto_mode(self):
+        with patch("studio.check_video_provider", side_effect=ValueError("No credits")):
+            self.assertEqual(select_video_backend("auto", "deployment"), "pilot")
+            with self.assertRaisesRegex(ValueError, "No credits"):
+                select_video_backend("runway", "deployment")

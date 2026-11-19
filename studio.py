@@ -570,6 +570,24 @@ def check_video_provider(key):
     return True
 
 
+def select_video_backend(requested, runway_key, plan_only=False, force_pilot=False):
+    if requested == "pilot" or (requested == "auto" and force_pilot):
+        return "pilot"
+    if requested == "runway":
+        if not plan_only:
+            check_video_provider(runway_key)
+        return "runway"
+    if runway_key:
+        if plan_only:
+            return "runway"
+        try:
+            check_video_provider(runway_key)
+            return "runway"
+        except (ProviderConnectionError, ProviderHTTPError, ValueError) as error:
+            phase("VIDEO", f"Managed video service unavailable ({error}). Using illustrated animation.")
+    return "pilot"
+
+
 def studio_main(args, root, config, ffmpeg_path, ffmpeg, captions, stamp):
     from copy import copy
 
@@ -632,9 +650,7 @@ def run_studio(args, root, config, ffmpeg_path, ffmpeg, captions, stamp):
             raise ValueError("The demo is authored in portrait. Studio also supports landscape.")
         if args.video_backend == "illustrated" and not args.plan_only:
             return render_illustrated(args, root, config, ffmpeg_path, ffmpeg, captions, stamp, production)
-        demo_runway = args.video_backend == "runway" or (args.video_backend == "auto" and not args.offline)
-        if demo_runway and not args.plan_only:
-            check_video_provider(runway_key)
+        demo_runway = select_video_backend(args.video_backend, runway_key, args.plan_only, args.offline) == "runway"
         style = pixel_style(args.style) if args.style and args.style != "auto" else STYLE
         if style.isdecimal() and 1 <= int(style) <= len(STYLES):
             style = STYLES[int(style) - 1]
@@ -651,7 +667,7 @@ def run_studio(args, root, config, ffmpeg_path, ffmpeg, captions, stamp):
             return render_plan(plan, ffmpeg_path(), ffmpeg, captions, stamp, root, job, config)
         return render_studio_plan(plan, runway_key, ffmpeg_path(), ffmpeg, captions, stamp, root, job, config)
     if args.video_backend == "illustrated":
-        raise ValueError("Use --demo --video-backend illustrated for the built-in story. Custom prompts use Runway.")
+        raise ValueError("Use --demo --video-backend illustrated for the built-in story. Custom prompts support the pilot and connected video backends.")
     if args.local_animation and not args.random:
         raise ValueError("--local-animation requires --random.")
     if args.seed is not None and not 0 <= args.seed <= 0xFFFFFFFF:
@@ -725,12 +741,12 @@ def run_studio(args, root, config, ffmpeg_path, ffmpeg, captions, stamp):
     chapters = plan.get("chapter_lengths") or [lengths[i:i + 9] for i in range(0, len(lengths), 9)]
     if len(plan["chapters"]) < len(chapters) and not openai:
         raise ValueError(HELP)
-    use_runway = args.video_backend == "runway" or (
-        args.video_backend == "auto" and (not args.resume or plan.get("renderer") != "original-phishing-pilot")
-    )
-    if use_runway and not args.plan_only:
-        check_video_provider(runway_key)
-    spec["render_backend"] = "runway" if use_runway else "pilot"
+    keep_pilot = args.offline or (args.resume and plan.get("renderer") == "original-phishing-pilot")
+    requested = "pilot" if args.cast_from and args.video_backend == "auto" else args.video_backend
+    spec["render_backend"] = select_video_backend(requested, runway_key, args.plan_only, keep_pilot)
+    use_runway = spec["render_backend"] == "runway"
+    if not use_runway and not args.plan_only:
+        phase("VIDEO", "Full-screen illustrated animation using the original pilot renderer.")
     spec.setdefault("requested_duration", spec["duration"])
     tool = None if args.plan_only else ffmpeg_path()
     job = job.resolve()
