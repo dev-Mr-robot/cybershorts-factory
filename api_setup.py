@@ -6,20 +6,13 @@ from pathlib import Path
 import sys
 import webbrowser
 
-from providers import ProviderHTTPError, request_json
+from providers import ProviderHTTPError
 from library import phase
-from chatgpt_planner import CHATGPT, signed_in, request_story
+from cloud import respond
 
 
 def active_key(config):
     return (os.getenv("OPENAI_API_KEY") or config.get("openai_api_key") or "").strip()
-
-
-def planning_access(config):
-    key = active_key(config)
-    if config.get("prefer_chatgpt"):
-        return CHATGPT if signed_in() else key
-    return key or (CHATGPT if signed_in() else "")
 
 
 KEYS_URL = "https://platform.openai.com/api-keys"
@@ -36,27 +29,13 @@ def open_key_page():
 
 
 def check(config, candidate=None):
-    key = planning_access(config) if candidate is None else candidate
-    if key is CHATGPT:
-        try:
-            if request_story("Return a JSON object with ok set to true.", {}).get("ok") is not True:
-                raise ValueError("Unexpected response.")
-        except (RuntimeError, ValueError) as error:
-            phase("API", f"ChatGPT planning check failed. {error}")
-            return False
-        phase("API", "ChatGPT planning via Codex works.")
-        return True
+    key = active_key(config) if candidate is None else candidate
     if not key:
-        phase("API", "Run Cyber --login for ChatGPT, Cyber --api-setup for an API key, or Cyber --demo for a local video.")
+        phase("API", "Set OPENAI_API_KEY in .env or run Cyber --api-setup. The local example is Cyber --offline --demo.")
         return False
     model = config.get("openai_model") or "gpt-4o-mini"
     try:
-        result = request_json("https://api.openai.com/v1/chat/completions", key, {
-            "model": model, "response_format": {"type": "json_object"},
-            "messages": [{"role": "user", "content": "Return a tiny JSON object with ok set to true."}],
-            "max_completion_tokens": 32,
-        }, timeout=25)
-        reply = json.loads(result["choices"][0]["message"]["content"])
+        reply = respond(key, model, "Reply with a tiny JSON object with ok set to true.", {}, timeout=25)
         if not isinstance(reply, dict) or reply.get("ok") is not True:
             raise ValueError("The model did not return the expected JSON response.")
     except ProviderHTTPError as error:

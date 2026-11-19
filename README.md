@@ -1,106 +1,57 @@
 # CyberShorts Factory
 
-## Default video format
+Describe a video in natural language. OpenAI's Responses API writes and checks the storyboard. Runway Gen‑4.5 generates moving clips, Edge TTS supplies the voices, and FFmpeg assembles the MP4. Hindi and vertical 1080×1920 are defaults. The previous 2D pilot renderer remains available explicitly.
 
-New productions use the actual animated Phishing pilot renderer: its 2D sprite construction, full-screen portrait layout, 24 fps, distinct shot framings, dialogue cards and speech-timed mouths. New productions receive a stable cast design and newly drawn backgrounds for their scene locations. Use `--recurring-cast` for legacy cast identities on custom cyber stories, or `--cast-from path/to/production.json` to reuse an explicitly saved pilot cast. This is the default for custom stories and `--demo`. Custom screenplays can use ChatGPT sign-in through Codex CLI or an OpenAI project API key. Dialogue uses Edge TTS. Use `--video-backend runway` or `--demo --video-backend illustrated` to explicitly select the older alternate renderers.
-
-Before rendering a custom story, Studio reviews what viewers will actually see and hear. If the logic is unclear, it revises the affected chapter and can add time for missing beats. If you already give a duration in the prompt or via `--duration`, Cyber skips the question. The requested duration is a starting target for AI-generated scripts. Review checks the setup, cause, consequence, and payoff, with particular attention to how each cybersecurity warning changes the safer choice. Review results and the final timeline are saved in `production.json`. The built-in refund demo uses an authored 60-second walkthrough.
-
-## Start with Cyber
-
-On Linux:
+## Install on Kali
 
 ```sh
-sh install.sh
+sh install_kali.sh
 Cyber
 ```
 
-The installer registers `Cyber` in `~/.local/bin` and prints a PATH command if needed. It uses Python 3.11+ and installs the core Python packages into the project's virtual environment. The core package includes a compatible FFmpeg fallback on supported platforms. For Hindi text on Linux, install your distribution's Noto Devanagari font package, for example `fonts-noto-core` on Debian/Ubuntu. If Python's virtual environment support is missing, install your distribution's `python3-venv` package and retry `Cyber --setup`.
+The installer lists missing packages and asks before using APT. Python packages go into the app's own virtual environment. If the installer says the launcher folder needs to be added to PATH, run the command it prints. On other Linux distributions use `sh install.sh`. On Windows use `powershell -NoProfile -File install.ps1`.
 
-On Windows, run `powershell -NoProfile -File install.ps1` from this folder, then open a new terminal and type `Cyber`. `Cyber.cmd` also runs directly from the project folder. The launcher can open the CLI if dependency setup fails. Use `Cyber --setup` to retry, `Cyber --setup-all` for optional 3D dependencies, or `Cyber --no-install` to skip automatic setup on a specific launch.
+Manual Kali setup:
 
-On an interactive launch, `Cyber` starts browser sign-in automatically when no OpenAI key or ChatGPT session is available and Codex CLI is installed. Cancel to continue with the local story bank. `Cyber --login` explicitly runs the installed Codex CLI's own sign-in flow. Missing Codex or a canceled sign-in leaves Cyber available. Built-in demos need neither Codex sign-in nor an OpenAI API key. Once signed in with ChatGPT, Cyber can use that session for screenplay planning and editorial review. Run `Cyber --chatgpt --api-check` for an optional generation test. Cyber prefers a configured API key on later launches unless you pass `--chatgpt`. The Codex CLI route uses text-only planning. Live source research still uses an OpenAI API key. See the [Codex CLI guide](https://developers.openai.com/codex/cli/).
-
-Describe a story in your own words. Examples include "Make a 30-second Hindi horror story in anime style", "Make it longer", and "Use the same character as my previous video". Interactive settings stay in the conversation. In the terminal, character reuse uses saved artwork designs from a previous pilot production. Commands include `help`, `menu`, `new`, `random`, `demo`, `history`, `settings`, and `exit`. Use `--cast-from path/to/production.json` for explicit reference reuse.
-
-New renders go inside the application under `videos/` with separate job folders, safe video filenames, scripts, subtitles, per-shot audio and footage, and `metadata.json`. Old files under `output/` are preserved. Custom prompts require either a ChatGPT-authenticated Codex CLI or an OpenAI key for planning. Runway requires a separate key only when selected explicitly. Without either connection, `random` draws from a local Hindi story bank and asks for a genre. Finished local stories are skipped until the selected genre runs out. Edge TTS needs internet access.
-
-## Windows
-
-In this folder:
-
-```powershell
-python -m venv .venv
-.\.venv\Scripts\python.exe -m pip install -r requirements.txt
-.\.venv\Scripts\python.exe main.py
+```sh
+sudo apt update
+sudo apt install python3 python3-venv ffmpeg mpv fonts-noto-core
+sh install.sh
 ```
 
-The prompt-first terminal accepts defensive cybersecurity ideas and general original films. Scripted calls also accept `--mode cyber` and `--mode general`. Both create full-screen stories with Hindi and cinematic 2D illustration as defaults. Use `--recurring-cast` to reuse the established cyber characters. `--studio` opens the same menu explicitly.
+Kali's [Python environment guidance](https://www.kali.org/docs/general-use/python3-external-packages/) recommends isolating Python packages. A desktop session is needed for the video window.
 
-Set `OPENAI_API_KEY` for planning and `RUNWAYML_API_SECRET` for moving footage in your shell. You can also set `openai_api_key` and `runway_api_key` in a private `config.local.json`. Edge TTS uses an internet connection. Studio sends prompts, character references and lines to the selected services and Runway jobs consume credits.
+## Configure online generation
 
-## Examples
+Copy `.env.example` to `.env` and add your keys locally:
 
-```powershell
-python main.py --mode cyber --topic "Password Security" --duration 60 --language Hinglish
-python main.py --mode cyber --duration 30
-python main.py --mode general --prompt "Two friends hear a mysterious signal from Mars" --duration 30 --language English --style "Pixel art"
-python main.py --list-styles
+```dotenv
+OPENAI_API_KEY=
+VIDEO_PROVIDER_API_KEY=
 ```
 
-- Use `--style auto` for a recommendation, a preset number, or custom style text. Use `--format portrait` or `--format landscape` for framing.
-- Set `--characters 0` to `--characters 8` in General mode. Cyber mode starts with at least two. Each generated shot uses up to three visible character references. Use `--locale en-GB` to request an accent, or repeat `--voice "Bunty=hi-IN-MadhurNeural"` for exact Edge voice IDs. View the catalog with `python -m edge_tts --list-voices`.
-- Use a language name or provider locale such as `fr-CA`. For invented languages, name the language in the prompt or language field and specify an approximate voice accent with `--locale`. The planner writes phonetic dialogue and translated subtitles. Edge gives distinct voices and changes delivery with rate and pitch. Exact emotion, pronunciation, lip sync and visual identity can vary by scene.
-- Set `--duration` in seconds from 15 through 3600. A 60-minute film plans hundreds of short clips and can take substantial provider time and credits. Use `--plan-only` to review the saved screenplay and shot list before any Runway requests.
-- Each production writes `movie.mp4`, `script.txt`, `subtitles.srt` and a resumable `production.json` under `videos/studio/`. Resume a plan or interrupted render with `python main.py --resume JOB_NAME`. Optional music goes in `assets/music/`; otherwise the editor uses its own quiet synth bed. Generated scenes use Runway Gen-4.5 motion, with reference-guided first frames for character shots, and are dubbed and assembled with FFmpeg.
+Use an [OpenAI project API key](https://platform.openai.com/api-keys) and a [Runway API key](https://dev.runwayml.com/). Exported variables take precedence over `.env`. `RUNWAYML_API_SECRET` is accepted as an alternative video-key variable. Edge TTS needs internet access and uses no TTS key. Keep `.env` out of Git.
 
-## Random video
+Run `Cyber --online-check` to test OpenAI JSON generation and read the Runway project's credit balance. A positive balance doesn't establish that there are enough credits for your whole film. OpenAI API billing and Runway's [video credits](https://docs.dev.runwayml.com/guides/pricing/) are separate. `Cyber --api-open` opens the OpenAI API key page.
 
-```powershell
-python main.py --random
-python main.py --random --local-animation
-python main.py --random --local-animation --style Pixelated --seed 379826793
+## Create and watch
+
+Type an idea into `Cyber`, or run:
+
+```sh
+Cyber --prompt 'एक हॉरर कहानी बनाओ, हिंदी में, 2 मिनट की।'
+Cyber --random --genre comedy --duration 45
+Cyber --play
 ```
 
-Each new job receives a seed for creative direction, pacing, visual treatment and music. Studio also passes recent concepts to the planner and carries a continuity brief and character references between shots. A recurring location can get its own visual reference. A seed is reproducible for local animation. Cloud planning and footage can still vary with the same seed. Use `--resume` to continue a specific Studio plan.
+Each production is saved under `videos/`, with its MP4, script, SRT, per-scene audio, and metadata. In the interactive CLI, choose **Play** after the export or type `play last` at the prompt. The mpv window supplies the timeline, elapsed and total time, pause, fullscreen and volume. Space pauses, arrows seek, 9/0 adjust volume, f toggles fullscreen, and q stops playback and returns to Cyber.
 
-With ChatGPT sign-in or an OpenAI key, `--random` plans an original story for the selected genre. Without a connection, or if a Hindi random request hits a provider error, it can select an unused story from the local Hindi bank. With an explicit `--local-animation`, it instead renders an English **Modern 3D Pixel Cinematic** short from a small story library. It varies casting, palettes, camera direction and music, and rotates recent premises. The local renderer uses an OpenGL 3.3 graphics driver for actual 3D geometry, shaded pixel materials, cast shadows, atmospheric depth, and moving cameras. It needs Edge TTS for dialogue, supports 24–120 seconds in landscape, and saves under `videos/random/`.
+`Cyber --play /path/to/video.mp4 --subtitles /path/to/dialogue.srt` attaches an optional external SRT. Cyber already burns its own captions into the video. mpv starts with software decoding and a window sized to the display. If mpv is missing, Cyber tries ffplay for basic playback.
 
-## Pixel styles
-
-`Pixelated`, `Pixel Art`, and preset `5` select **Modern 3D Pixel Cinematic**. Other Studio presets include High-Resolution Pixel Art, 3D Voxel Cinematic, Pixel-Shader 3D, Hybrid 3D + Pixel, Pixel Cyberpunk, Pixel Fantasy, and Pixel Realism. These are distinct Runway art directions. The local generator implements Modern 3D Pixel Cinematic plus **Retro Pixel Art**, which is available only by explicit selection (for example, `--style "Retro Pixel Art"` or `--style "8-bit"`).
-
-## Kali Linux, natural-language prompts, and API setup
-
-Run `sh install.sh` once, then `Cyber`. If the installer asks you to add its bin folder to PATH, use the displayed command. On Kali, install `python3-venv`, `ffmpeg`, and `fonts-noto-core` through APT if your system needs them. The application's dependencies install into its own virtual environment.
-
-- Type `random` to pick a genre, then enter the duration in seconds. You can also say `random horror`, `random comedy`, or `एक रैंडम डरावनी कहानी बनाओ` directly.
-- Use `Cyber --random --genre horror` for noninteractive generation. With an OpenAI key it creates a new premise and checks recent titles and summaries before accepting it. Without a key it selects an unused authored Hindi story from the chosen genre. Use `--offline` or type `offline random horror` to choose this path even when a key is configured.
-- Run `Cyber --login` and choose ChatGPT if the Codex CLI is installed. Alternatively, run `Cyber --api-open` to open the API key page and `Cyber --api-setup` to enter a project API key through a hidden prompt. Run `Cyber --api-check` for a small real JSON generation check on the active connection. Keys stay in the ignored local config or the environment. An exported `OPENAI_API_KEY` takes precedence. Model access and available generation quota are separate.
-- Follow-ups such as `Make it longer`, `इसे अंग्रेज़ी में बनाओ`, and `Use anime style` carry over the current idea in the terminal session.
-
-## Source research
-
-Cybersecurity and factual prompts try web research before screenplay planning. The planner and editorial check receive the notes, and source links are saved in `sources.json`. Use `--research` to request the lookup for another topic, or `--no-research` to skip it. If the lookup is unavailable, the screenplay uses conservative claims and the output records the lookup status. The refund demo includes a curated NPCI reference. Optional research uses OpenAI's [Responses web search](https://developers.openai.com/api/docs/guides/tools-web-search).
-
-## Full-screen Hindi demo
-
-```powershell
-python main.py --demo
-python main.py --demo --video-backend illustrated
-python main.py --demo --video-backend runway
-```
-
-**पैसे आए या गए?** is a six-scene Hindi short about a fake refund and a friend who notices the payment warning. Use `--demo-story flame` for **शहर की आख़िरी लौ**, the earlier rooftop story. The default uses the original Phishing pilot renderer. Runway Gen-4.5 is available with explicit backend selection. The illustrated version uses original ImageGen art, articulated 2D animation, Edge TTS, Devanagari captions, and an original soundtrack. The built-in screenplay is authored, so `--demo` needs no planning key. The illustrated version is available without paid video credits. Both render full-screen.
-
-Custom productions have stable cast reference images, a character-design manifest, and per-shot timing and provider records. When available, captions and dialogue timings guide generated movement. Text-based timing is approximate. Custom generation requires OpenAI for the screenplay and Runway for moving clips. Prior split-screen files are archived.
-
-## Existing animated pilot
-
-`python main.py --topic "Phishing"` still renders the locally illustrated Bunty, Meera and Patch episode. It needs Edge TTS but uses neither the OpenAI nor Runway API key. To make a new Phishing film with Runway, use `--mode cyber --topic "Phishing"`.
-
-Provider references: [Runway API](https://docs.dev.runwayml.com/api/), [OpenAI Chat Completions](https://developers.openai.com/api/reference/resources/chat/subresources/completions/methods/create), and [Edge TTS](https://github.com/rany2/edge-tts).
+- Run `Cyber --player-check` to inspect FFmpeg, FFprobe, player, display, and available mpv decoder and audio drivers. It takes playback to verify the actual display and sound device.
+- On a headless session, copy the MP4 to a desktop or use `mpv --vo=null /path/to/video.mp4` for audio only.
+- Use `--plan-only` for a screenplay without Runway clips. Use `--video-backend pilot` for an online screenplay with the original illustrated renderer, or `Cyber --offline --demo` for the authored local screenplay and illustrated renderer. Voices still use the online Edge service.
 
 ## Example
 
-[Download the 60-second Hindi refund-scam demo](examples/paise_aaye_ya_gaye.mp4). It uses the original Phishing pilot renderer.
+[Watch the earlier 60-second Hindi refund-scam demo](examples/paise_aaye_ya_gaye.mp4). It uses the illustrated pilot renderer.

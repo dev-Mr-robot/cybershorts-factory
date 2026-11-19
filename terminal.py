@@ -6,8 +6,9 @@ import re
 import sys
 
 from library import phase
-from api_setup import planning_access, check, open_key_page, setup
+from api_setup import active_key, check, open_key_page, setup
 from random_stories import choose_genre, genre_in
+import player
 
 BANNER = r"""
 +--------------------------------------------------+
@@ -97,6 +98,7 @@ def latest_jobs(root):
 def conversation(args, root, config, generate):
     colored = sys.stdout.isatty() and "NO_COLOR" not in os.environ and os.environ.get("TERM") != "dumb"
     print(f"\033[36;1m{BANNER}\033[0m" if colored else BANNER)
+    print("नमस्ते! आज कैसी वीडियो बनानी है?")
     print("Describe a video, or type help, random, demo, history, settings, new or exit.")
     prior = None
     while True:
@@ -126,6 +128,9 @@ def conversation(args, root, config, generate):
             if not items:
                 print("No videos in the new library yet.")
             continue
+        if command in {"play", "play last"}:
+            player.play(player.latest(root))
+            continue
         if command == "settings":
             print("Hindi | Original Phishing pilot format | 1080×1920 portrait by default")
             print(root / "videos")
@@ -145,7 +150,7 @@ def conversation(args, root, config, generate):
         run = copy.copy(args)
         run.studio = False
         run.offline = run.offline or "offline" in command.split()
-        openai = "" if run.offline else planning_access(config)
+        openai = "" if run.offline else active_key(config)
         if command == "demo":
             run.demo = True
         else:
@@ -163,16 +168,16 @@ def conversation(args, root, config, generate):
             request = interpret(text, prior)
             prior = request
             if request["random"] and not request.get("genre"):
-                request["genre"] = choose_genre(local=not openai)
+                request["genre"] = choose_genre(local=run.offline)
                 if request["genre"] is None:
                     continue
-            if request["duration"] is None and (openai or request["random"]):
-                request["duration"] = choose_duration(local=not openai)
+            if request["duration"] is None and (openai or run.offline):
+                request["duration"] = choose_duration(local=run.offline)
                 if request["duration"] is None:
                     continue
-            if request["random"] and not openai:
+            if request["random"] and run.offline:
                 if request["language"] != "Hindi":
-                    print("The local story bank is in Hindi. Run Cyber --login or use api setup to generate another language.")
+                    print("The local story bank is in Hindi. Use api setup to connect an OpenAI project key.")
                     continue
                 run.random = True
                 run.genre = request.get("genre")
@@ -180,7 +185,7 @@ def conversation(args, root, config, generate):
                 if request["revision"] and (run.genre in (None, "any", request.get("last_local_genre"))):
                     run.local_story = request.get("last_local_story")
             elif not openai:
-                print("Custom prompts need ChatGPT sign-in or an API key. Run Cyber --login, type api setup, or use random for local stories.")
+                print("Online generation needs OPENAI_API_KEY and VIDEO_PROVIDER_API_KEY. Type api setup for help, or offline random for the local story bank.")
                 continue
             else:
                 run.prompt = request["idea"]
@@ -199,7 +204,11 @@ def conversation(args, root, config, generate):
                         continue
         try:
             phase("START", "Preparing production")
+            before = player.latest(root)
             generate(run)
+            after = player.latest(root)
+            if after and after != before and sys.stdin.isatty() and player.after_export(after):
+                return
             if run.random and not openai and prior is not None and (jobs := latest_jobs(root)):
                 record = jobs[0].parent / "production.json"
                 if record.is_file():
