@@ -12,13 +12,25 @@ claims and remove unsupported specifics. For cybersecurity, show what the victim
 sign, the consequence or narrowly avoided consequence, and demonstrate a defensive alternative
 and its result. Keep all examples defensive and avoid attack replication or payloads. Other genres
 should make their own story logic and payoff clear; don't force an explanation into fiction.
+For a factual or educational explanation require every link: the starting situation;
+the specific decision or event; why that changes the outcome; and a usable takeaway
+or a clear limit. Reject a label or moral that replaces the explanation. Use one concrete
+example or a before/after contrast the intended viewer can follow. Keep technical
+terminology plain and separate what is observed from what is inferred. In a cyber
+story explain how a specific warning changes the safer choice without teaching an
+attacker's procedure. In fiction, cause and payoff should follow from on-screen
+actions and character choices. Never stretch a story by repeating the lesson.
+Respect spoken pacing: ask for an extra beat when the dialogue is too dense to follow.
 For short films check the whole arc; for chapters judge their contribution to the full outline.
 For the pilot backend, the animation can show stock gestures, speech, reaction shots,
 actor entrances, custom phone screens (pilot_phone), and two-line evidence cards
 (pilot_evidence). An action beyond those capabilities needs an achievable equivalent
 in the actual shots. A generic card without the distinguishing clue does not count.
 Return JSON with passed (boolean), feedback (specific revisions, as a single string),
-and extra_seconds (an integer from 0 to 30). Ask for more time if another action beat is needed.
+extra_seconds (an integer from 0 to 30), and logic (an object with setup,
+cause, consequence, and payoff, each a short statement of what is visible or audible).
+Use an empty value for an absent link. Only pass when every link relevant to the chapter's
+role is supported by the script. Ask for more time if another action beat is needed.
 Pass only if the important logic is already understandable on screen."""
 
 
@@ -43,7 +55,16 @@ def inspect_story(plan, key, model, ask, rewrite, save):
             feedback = str(verdict.get("feedback", ""))[:2200]
             extra = verdict.get("extra_seconds", 0)
             extra = max(0, min(30, extra)) if type(extra) is int else 0
-            results[str(index)] = {"passed": passed, "feedback": feedback, "extra_seconds_requested": extra}
+            logic = verdict.get("logic", {})
+            logic = {name: value[:400] for name, value in logic.items()
+                     if name in {"setup", "cause", "consequence", "payoff"} and isinstance(value, str)} if isinstance(logic, dict) else {}
+            if passed and spec["mode"] == "cyber" and len(plan["chapters"]) == 1 and not all(
+                logic.get(name, "").strip() for name in ("setup", "cause", "consequence", "payoff")
+            ):
+                passed = False
+                feedback = "Make the setup, causal mechanism, consequence and defensive payoff explicit in the script. " + feedback
+            results[str(index)] = {"passed": passed, "feedback": feedback,
+                                   "extra_seconds_requested": extra, "logic": logic}
             save()
             if passed:
                 break

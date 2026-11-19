@@ -38,6 +38,22 @@ def duration_hint(line):
     return int(match[1]) * (60 if match[2].startswith("m") else 1) if match else None
 
 
+def choose_duration(local=False):
+    minimum, maximum, default = (24, 60, 28) if local else (15, 3600, 60)
+    while True:
+        try:
+            answer = input(f"How many seconds? [{default}, {minimum}–{maximum}, or cancel]: ").strip()
+        except (EOFError, KeyboardInterrupt):
+            print()
+            return None
+        if answer.casefold() in {"cancel", "exit", "quit", "रद्द"}:
+            return None
+        seconds = default if not answer else int(answer) if answer.isdecimal() else duration_hint(answer.casefold())
+        if seconds is not None and minimum <= seconds <= maximum:
+            return seconds
+        print(f"Enter a duration from {minimum} to {maximum} seconds.")
+
+
 def interpret(text, prior):
     line = text.casefold().strip(" .!")
     language = next((value for name, value in LANG.items()
@@ -147,6 +163,10 @@ def conversation(args, root, config, generate):
                 request["genre"] = choose_genre(local=not openai)
                 if request["genre"] is None:
                     continue
+            if request["duration"] is None and (openai or request["random"]):
+                request["duration"] = choose_duration(local=not openai)
+                if request["duration"] is None:
+                    continue
             if request["random"] and not openai:
                 if request["language"] != "Hindi":
                     print("The local story bank is in Hindi. Use api setup to generate another language.")
@@ -160,8 +180,6 @@ def conversation(args, root, config, generate):
                 print("Custom prompts need an OpenAI key. Type api setup to add one, or random for local stories by genre.")
                 continue
             else:
-                if request["duration"] is None:
-                    request["duration"] = 60
                 run.prompt = request["idea"]
                 run.random = request["random"]
                 run.genre = request.get("genre")

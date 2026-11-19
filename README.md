@@ -4,7 +4,7 @@
 
 New productions use the actual animated Phishing pilot renderer: its 2D sprite construction, full-screen portrait layout, 24 fps, distinct shot framings, dialogue cards and speech-timed mouths. New productions receive a stable cast design and newly drawn backgrounds for their scene locations. Use `--recurring-cast` for legacy cast identities on custom cyber stories, or `--cast-from path/to/production.json` to reuse an explicitly saved pilot cast. This is the default for custom stories and `--demo`. Custom screenplay planning uses OpenAI and dialogue uses Edge TTS. Use `--video-backend runway` or `--demo --video-backend illustrated` to explicitly select the older alternate renderers.
 
-Before rendering a custom story, Studio reviews what viewers will actually see and hear. If the logic is unclear, it revises the affected chapter and can add time for missing beats. The requested duration is a starting target. Review results and the final timeline are saved in `production.json`. The built-in refund demo uses an authored 60-second walkthrough.
+Before rendering a custom story, Studio reviews what viewers will actually see and hear. If the logic is unclear, it revises the affected chapter and can add time for missing beats. If you already give a duration in the prompt or via `--duration`, Cyber skips the question. The requested duration is a starting target for AI-generated scripts. Review checks the setup, cause, consequence, and payoff, with particular attention to how each cybersecurity warning changes the safer choice. Review results and the final timeline are saved in `production.json`. The built-in refund demo uses an authored 60-second walkthrough.
 
 ## Start with Cyber
 
@@ -74,7 +74,7 @@ With an OpenAI key, `--random` plans an original story for the selected genre. W
 
 Run `sh install.sh` once, then `Cyber`. If the installer asks you to add its bin folder to PATH, use the displayed command. On Kali, install `python3-venv`, `ffmpeg`, and `fonts-noto-core` through APT if your system needs them. The application's dependencies install into its own virtual environment.
 
-- Type `random` to pick a genre, or say `random horror`, `random comedy`, or `एक रैंडम डरावनी कहानी बनाओ` directly.
+- Type `random` to pick a genre, then enter the duration in seconds. You can also say `random horror`, `random comedy`, or `एक रैंडम डरावनी कहानी बनाओ` directly.
 - Use `Cyber --random --genre horror` for noninteractive generation. With an OpenAI key it creates a new premise and checks recent titles and summaries before accepting it. Without a key it selects an unused authored Hindi story from the chosen genre. Use `--offline` or type `offline random horror` to choose this path even when a key is configured.
 - Run `Cyber --api-setup` to enter a project API key through a hidden prompt. Run `Cyber --api-check` to verify model access. Keys stay in the ignored local config or the environment. An exported `OPENAI_API_KEY` takes precedence. Model access and available generation quota are separate.
 - Follow-ups such as `Make it longer`, `इसे अंग्रेज़ी में बनाओ`, and `Use anime style` carry over the current idea in the terminal session.

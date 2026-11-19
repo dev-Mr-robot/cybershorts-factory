@@ -275,7 +275,11 @@ def chapter(key, model, spec, story, index, slots, previous, feedback=None, draf
     For a non-phone shot, pilot_evidence can show a two-string label and an observable
     result or contrast (compact English display text). Use specific visual evidence from the
     story. Never show actual credentials, payloads, or attack steps.
-    If editorial_feedback is present, revise the draft to fix it and preserve cast, continuity, and required shot lengths.
+    For educational scenes, write the cause and why the result follows in plain audience language.
+    Show an observable example or contrast, then a concrete result or takeaway. The
+    audience should be able to infer what would change if the character made a different
+    choice. Avoid filler and unsupported logical jumps. If editorial_feedback is present,
+    revise the draft to fix it and preserve cast, continuity, and required shot lengths.
     Full-screen story scenes should use in-world character acting and dialogue. Use
     voice-over sparingly when it serves the genre. Build poses and distinct physical
     actions, keeping wardrobe, face, hair, props and layout stable within a story.

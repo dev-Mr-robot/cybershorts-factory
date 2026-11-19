@@ -15,7 +15,7 @@ import wave
 
 from content import BEATS, generate, key
 from library import finish, job_name, slug
-from terminal import conversation, interpret
+from terminal import choose_duration, conversation, interpret
 from api_setup import active_key, check as api_check, setup as api_setup
 from random_stories import choose_genre, genre_in
 from studio import studio_main, studio_parser
@@ -289,10 +289,16 @@ def main():
         return api_setup(ROOT, config)
     if args.api_check:
         return api_check(config)
-    if args.random and not args.genre and not args.local_animation and not args.demo and sys.stdin.isatty():
-        args.genre = genre_in(args.prompt or args.topic or "") or choose_genre(local=args.offline or not active_key(config))
-        if args.genre is None:
-            return
+    if args.random and not args.local_animation and not args.demo and not args.studio and sys.stdin.isatty():
+        local = args.offline or not active_key(config)
+        if not args.genre:
+            args.genre = genre_in(args.prompt or args.topic or "") or choose_genre(local=local)
+            if args.genre is None:
+                return
+        if args.duration is None:
+            args.duration = choose_duration(local=local)
+            if args.duration is None:
+                return
     if len(sys.argv) == 1 or args.studio:
         return conversation(args, ROOT, config, lambda run: studio_main(
             run, ROOT, config, ffmpeg_path, ffmpeg, captions, stamp))
