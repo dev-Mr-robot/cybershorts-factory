@@ -213,7 +213,7 @@ def blueprint(key, model, spec, chapter_count):
         fixed = spec["reuse_cast"]
         if len(cast) != len(fixed) or [c["name"].casefold() for c in cast] != [c["name"].casefold() for c in fixed]:
             raise ValueError("The planner changed the requested reusable cast. Retry the story plan.")
-        cast = data["cast"] = [dict(person) for person in fixed]
+        cast = data["cast"] = [proposed | saved for proposed, saved in zip(cast, fixed)]
     if not isinstance(cast, list) or len(cast) != spec["count"] or len(data["chapters"]) != chapter_count:
         raise ValueError("The planner returned the wrong number of characters or chapters.")
     names = set()
@@ -224,7 +224,8 @@ def blueprint(key, model, spec, chapter_count):
         if folded in names or folded in {"narrator", "voiceover"}:
             raise ValueError("The planner used duplicate or reserved character names.")
         names.add(folded)
-        character["tag"] = f"actor{index}"
+        tag = character.get("tag") if spec.get("reuse_cast") else None
+        character["tag"] = tag if isinstance(tag, str) and re.fullmatch(r"[a-z][a-z0-9_]{1,15}", tag) else f"actor{index}"
     if spec["mode"] == "cyber" and spec.get("recurring_cast"):
         fixed = list(RECURRING.items())[:spec["count"]]
         if [person["name"].casefold() for person in cast[:len(fixed)]] != [name.casefold() for name, _ in fixed]:
@@ -656,7 +657,10 @@ def studio_main(args, root, config, ffmpeg_path, ffmpeg, captions, stamp):
             pilot_designs = previous.get("pilot_art", {}).get("designs", {})
             if not cast:
                 raise ValueError("The previous production does not contain a cast.")
-            if args.video_backend == "runway" and any(not (source.parent / f"{person['tag']}.jpg").is_file() for person in cast):
+            if args.video_backend == "runway" and any(
+                not re.fullmatch(r"[a-z][a-z0-9_]{1,15}", str(person.get("tag", "")))
+                or not (source.parent / f"{person['tag']}.jpg").is_file() for person in cast
+            ):
                 raise ValueError("Runway cast reuse needs saved reference images.")
             if args.video_backend != "runway" and not pilot_designs:
                 raise ValueError("Pilot cast reuse needs a production with saved character designs.")
